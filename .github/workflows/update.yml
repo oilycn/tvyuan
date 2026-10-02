@@ -2,40 +2,34 @@ name: TVBox 自动更新
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 * * * *'  # 每小时整点更新
+  workflow_dispatch:      # 支持手动触发测试
+
+permissions:
+  contents: write
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
         with:
-          token: ${{ secrets.GH_PAT }}
+          python-version: '3.10'
 
       - name: 运行更新脚本
         env:
-          CF_PROXY: https://tv.cc0cd.cc.cd
+          # 如果搭建了下面的 CF Worker，填你自己的域名；若没有，可先留空
+          CF_PROXY: https://tv.gnoix.com
         run: python3 update.py
 
-      - name: 推送更新
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+      - name: 提交并推送到当前仓库
         run: |
-          git config user.email "bot@tvbox.local"
-          git config user.name "TVBox Bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
           git add -A
-          git diff --cached --quiet && echo "无变更" && exit 0
+          git diff --cached --quiet && echo "无内容变动" && exit 0
           git commit -m "auto update: $(date -u '+%Y-%m-%d %H:%M:%S')"
-
-          # 推送到 GitHub（全量）
-          git remote set-url origin https://25175:${GH_PAT}@github.com/25175/tvyuan.git
           git push origin HEAD:master
-
-          # 推送到 Gitee（tvbox_full.json 被审查拦截451，不推送）
-          git remote add gitee https://oauth2:${GITEE_TOKEN}@gitee.com/onm-hundred-and-eleven/tvyuan.git 2>/dev/null || true
-          git rm --cached tvbox_full.json
-          rm -f tvbox_full.json
-          git commit -m "gitee: 移除被拦截的全量版"
-          git push gitee HEAD:main --force 2>/dev/null || echo "Gitee 推送跳过"
