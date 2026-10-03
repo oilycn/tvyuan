@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TVBox 聚合源自动更新（终极定制版 - 集成 jsDelivr 智能还原）
-- 1. 【新增】jsDelivr 智能还原转换：将 cdn/fastly/gcore.jsdelivr.net/gh/user/repo@branch/path
-     统一还原并转换为标准的 https://gh-proxy.com/https://raw.githubusercontent.com/...
-- 2. 精品版 (tvbox.json / 根路径 /)：精选 120 站 (95 个低延迟高清爬虫 + 25 个实测极速采集) + 10 个最快直播源
-- 3. 全量版 (tvbox_full.json / 路径 /all)：1300+ 站点超大海量全收录，无任何数量限制
-- 4. 智能 GitHub 代理清洗：剥离任何套娃加速前缀，标准化为单层 gh-proxy.com
-- 5. 爬虫站专属 Jar 继承 + 去广告 rules/flags 完整保留 + 阿里 DoH 防劫持 + 超清壁纸
+TVBox 聚合源自动更新（终极定制版 - 修复爬虫相对路径与多源平权分配）
+- 1. 【核心修复】：将 api 中的 ./lib/drpy2.min.js 和 ./py/xxx.py 补全为绝对路径，彻底解决电视端空白加载不出内容
+- 2. 【多源平权】：精品版中单一来源最多贡献 6 站，避免单个源霸屏垄断，汇集 16+ 个顶流大源
+- 3. 【垃圾过滤】：自动剔除 配置中心、本地、预告、说明、推送 等非影视占位站
+- 4. 精品版 (tvbox.json / 根路径 /)：精选 120 站 (95 个多源优质高清爬虫 + 25 个实测极速采集) + 10 个最快直播源
+- 5. 全量版 (tvbox_full.json / 路径 /all)：1300+ 站点超大海量全收录，无任何数量限制
+- 6. jsDelivr 还原 + 剥离套娃代理清洗 GitHub 链接，标准化为单层 gh-proxy.com
+- 7. 爬虫站专属 Jar 继承 + 去广告 rules/flags 完整保留 + 阿里 DoH 防劫持 + 超清壁纸
 """
 import json
 import sys
@@ -23,17 +24,14 @@ WORK_DIR = os.path.dirname(os.path.abspath(__file__))
 CF_PROXY = os.environ.get("CF_PROXY", "").rstrip("/")  # Cloudflare Worker 代理地址
 BOUTIQUE_LIMIT = 120  # 精品版固定凑齐 120 个最强源
 BOUTIQUE_LIVES_LIMIT = 10  # 精品版只取 10 个最快的直播源
+MAX_SPIDERS_PER_SOURCE = 6  # 精品版中单个来源最多允许入选的爬虫站数量（防止单一源霸屏垄断）
+
+# 非影视类的垃圾占位符过滤关键词
+SKIP_KEYWORDS = ["配置中心", "本地", "预告", "说明", "更新", "推送", "测试", "公告", "留言", "网盘配置"]
 
 
 def gh_proxy_url(url):
-    """
-    智能 GitHub 代理清洗转换器：
-    1. 自动将各类 jsdelivr 镜像 (cdn/fastly/gcore.jsdelivr.net/gh/user/repo@branch/path)
-       还原并标准化为 https://gh-proxy.com/https://raw.githubusercontent.com/...
-    2. 自动剥离第三方套娃加速域名（down.nigx.cn、ghfast.top、重复套娃 gh-proxy 等）
-    3. 保留原有 ;md5; 校验
-    4. 非 GitHub 链接原样保留
-    """
+    """智能 GitHub 代理清洗转换器：还原 jsDelivr，剥离套娃前缀，标准化为单一代理"""
     if not isinstance(url, str) or not url.startswith("http"):
         return url
     
@@ -43,7 +41,7 @@ def gh_proxy_url(url):
         url, md5_val = parts[0], parts[1]
         md5_suffix = f";md5;{md5_val}"
 
-    # 1. 识别并转换各类 jsDelivr 格式: /gh/user/repo@branch/path 或 /gh/user/repo/path
+    # 1. 还原并标准化 jsDelivr 链接
     m_jsd = re.search(r'https?://(?:[\w-]+\.)?jsdelivr\.net/gh/([^/@]+)/([^/@]+)(?:@([^/]+))?/(.+)', url)
     if m_jsd:
         user = m_jsd.group(1)
@@ -53,7 +51,7 @@ def gh_proxy_url(url):
         raw_target = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/{path}"
         return f"https://gh-proxy.com/{raw_target}{md5_suffix}"
 
-    # 2. 匹配并提取纯粹的 GitHub 根路径（剥离任何套娃前缀）
+    # 2. 提取纯粹的 GitHub 根路径并包裹代理
     m = re.search(r'((?:https?://)?(?:raw\.githubusercontent\.com|github\.com)/[^\s"\';]+)', url)
     if m:
         raw_target = m.group(1)
@@ -298,14 +296,14 @@ def main():
     available.sort(key=lambda x: x[2])
     print(f"  可用源数量: {len(available)}")
 
-    # ── 3. 抓取、合并与收集 ──
+    # ── 3. 抓取、合并与清洗 ──
     all_sites, all_parses = [], []
     all_rules, all_flags = [], []
     site_keys, seen_collect_hosts, live_keys = set(), set(), set()
     rule_keys, flag_keys = set(), set()
     spider_jars = {}
     collect_sources = {}
-    all_lives_with_lat = []  # 记录带有来源延迟的直播列表
+    all_lives_with_lat = []
 
     for name, url, lat in available:
         sys.stdout.write(f"\r  合并源: {name} ({lat}ms)")
@@ -323,10 +321,15 @@ def main():
             if not isinstance(s, dict):
                 continue
             key = s.get("key", "")
+            raw_name = s.get("name", key)
             api = s.get("api", "")
             st = s.get("type", -1)
 
             if not key or key in site_keys:
+                continue
+
+            # 过滤非影视类占位项（配置中心、本地、预告等）
+            if any(kw in raw_name or kw in key for kw in SKIP_KEYWORDS):
                 continue
 
             # 域名排重仅针对 CMS 采集站(type 0/1)
@@ -337,14 +340,15 @@ def main():
                 seen_collect_hosts.add(api_host)
 
             site_keys.add(key)
-            s["name"] = f"[{lat}ms|{name}] {s.get('name', key)}"
+            s["name"] = f"[{lat}ms|{name}] {raw_name}"
             s["_lat"] = lat
+            s["_src_name"] = name  # 记录所属来源，便于精品版做多源配额平衡
 
             # 爬虫站继承专属 Jar
             if st == 3 and not s.get("jar") and abs_spider:
                 s["jar"] = abs_spider
 
-            # 相对路径修复 + jsDelivr / GitHub 代理清洗
+            # 相对路径修复 + GitHub 代理清洗
             ext = s.get("ext", "")
             if isinstance(ext, str) and ext:
                 is_rel_file = ext.startswith(("./", "../", "/")) or (
@@ -356,10 +360,14 @@ def main():
                     ext = resolve_url(url, ext)
                 s["ext"] = gh_proxy_url(ext)
 
+            # 【核心修复】：解决电视端空白问题！自动将 api 相对路径 (./lib/drpy2.min.js, ./py/xxx.py) 补全为绝对 URL
+            if isinstance(api, str) and api:
+                if api.startswith(("./", "../", "/")):
+                    api = resolve_url(url, api)
+                s["api"] = gh_proxy_url(api)
+
             if s.get("jar"):
                 s["jar"] = gh_proxy_url(s["jar"])
-            if isinstance(api, str) and api.startswith("http"):
-                s["api"] = gh_proxy_url(api)
 
             all_sites.append(s)
 
@@ -367,7 +375,7 @@ def main():
             if st in (0, 1) and isinstance(api, str) and api.startswith("http") and api not in collect_sources:
                 collect_sources[api] = (name, st)
 
-        # 收集直播源并记录其所属源的延迟（用于精品版选最快 10 个直播源）
+        # 收集直播源并记录其所属源的延迟
         for l in (data.get("lives") or []):
             u = l.get("url", "") if isinstance(l, dict) else ""
             if u and u not in live_keys:
@@ -496,15 +504,15 @@ def main():
     clean_parses = clean_parses[:15]
 
     # 直播源：全量直播 vs 精品 10 个最快直播
-    all_lives_with_lat.sort(key=lambda x: x[0])  # 按来源延迟由低到高排序
+    all_lives_with_lat.sort(key=lambda x: x[0])  # 按来源延迟排序
     boutique_lives = [l for lat, l in all_lives_with_lat[:BOUTIQUE_LIVES_LIMIT]]
     full_lives = [l for lat, l in all_lives_with_lat]
 
     best_spider = max(spider_jars, key=spider_jars.get) if spider_jars else ""
     best_spider = gh_proxy_url(best_spider)
 
-    # ── 6. 生成 tvbox.json（精品主力版，默认根路径 / 访问）──
-    # 策略：前 25 个最快采集站 + 前 95 个最低延迟优质爬虫站 = 刚好凑满 120 站
+    # ── 6. 生成 tvbox.json（精品主力版：多源平权分配 120 站）──
+    # 1. 提取最快的 25 个实测采集站 (Type 0/1)
     top_cms_sites = []
     for idx, (ttfb, speed, api, stype) in enumerate(collect_results[:25], 1):
         clean_name = urlparse(api).netloc or f"采集站{idx}"
@@ -524,18 +532,42 @@ def main():
         })
 
     needed_spiders = BOUTIQUE_LIMIT - len(top_cms_sites)  # 需要补充的爬虫站数量 (95个)
-    top_spider_sites = []
+
+    # 2. 【多源平权策略】：单一来源最多取 MAX_SPIDERS_PER_SOURCE (6) 个，避免 vv 独占霸屏
+    source_distribution = {}
+    balanced_spiders = []
     for s in ordered_all_sites:
-        if s.get("type") == 3:
+        if s.get("type") != 3:
+            continue
+        src = s.get("_src_name", "other")
+        if source_distribution.get(src, 0) < MAX_SPIDERS_PER_SOURCE:
+            source_distribution[src] = source_distribution.get(src, 0) + 1
             s_copy = dict(s)
-            s_copy["quickSearch"] = 1  # 精品版全部开启快速搜索
+            s_copy.pop("_src_name", None)
+            s_copy["quickSearch"] = 1
             s_copy["searchable"] = 1
-            top_spider_sites.append(s_copy)
-            if len(top_spider_sites) >= needed_spiders:
+            balanced_spiders.append(s_copy)
+            if len(balanced_spiders) >= needed_spiders:
                 break
 
-    # 优质爬虫排最前享受 4K 秒播，最快采集站紧随其后作为兜底
-    boutique_sites = top_spider_sites + top_cms_sites
+    # 若第一轮配额未凑满 95 个，从剩余优质爬虫中按顺序补齐
+    if len(balanced_spiders) < needed_spiders:
+        for s in ordered_all_sites:
+            if s.get("type") == 3 and s not in balanced_spiders:
+                s_copy = dict(s)
+                s_copy.pop("_src_name", None)
+                s_copy["quickSearch"] = 1
+                s_copy["searchable"] = 1
+                balanced_spiders.append(s_copy)
+                if len(balanced_spiders) >= needed_spiders:
+                    break
+
+    # 清理全量站点中的临时标识
+    for s in ordered_all_sites:
+        s.pop("_src_name", None)
+
+    # 优质爬虫站置顶排最前，最快采集站置后兜底，精准凑齐 120 站
+    boutique_sites = balanced_spiders + top_cms_sites
 
     boutique_json = {
         "spider": best_spider,
@@ -551,7 +583,7 @@ def main():
     }
     with open(os.path.join(WORK_DIR, "tvbox.json"), "w", encoding="utf-8") as f:
         json.dump(boutique_json, f, ensure_ascii=False, indent=2)
-    print(f"  [精品主力版] 输出完成 (tvbox.json): 凑满 {len(boutique_sites)} 站 (优质爬虫:{len(top_spider_sites)} 采集:{len(top_cms_sites)}) + 精选 {len(boutique_lives)} 个最快直播源")
+    print(f"  [精品主力版] 输出完成 (tvbox.json): 凑满 {len(boutique_sites)} 站 (汇聚 {len(source_distribution)} 个大源的精选爬虫 + {len(top_cms_sites)} 个高速采集) + 精选 {len(boutique_lives)} 个最快直播源")
 
     # ── 7. 生成 tvbox_full.json / tvbox_all.json（全量版，路径 /all 访问）──
     full_json = {
