@@ -2,7 +2,7 @@ name: TVBox 自动更新
 
 on:
   schedule:
-    - cron: '0 * * * *'  # 每小时整点更新
+    - cron: '0 4,10,16,22 * * *'  
   workflow_dispatch:      # 支持手动触发测试
 
 permissions:
