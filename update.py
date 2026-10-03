@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TVBox 聚合源自动更新（终极无Bug版 - 智能代理清洗重构）
-- 1. 【重构代理算法】精准提取 GitHub 根路径，自动剥离任何第三方套娃加速域名，统一标准化为 gh-proxy.com
-- 2. 域名排重仅作用于采集站(type 0/1)，杜绝误杀共享域名的 JS 爬虫站
-- 3. 严谨识别 ext 相对文件路径，防止普通参数字符串被误拼接
-- 4. 多线程测速子任务增加全局异常隔离，保证主进程永不崩溃
-- 5. 简洁版站点 key 保证绝对唯一，防止 TVBox 内部同名覆盖
-- 6. 爬虫站专属 Jar 继承 + 去广告 rules/flags 完整保留
-- 7. 前 25 优质站分级聚合搜索，彻底解决电视端搜片卡顿
-- 8. 过滤无用死链采集站，内置阿里 DoH + Bing 每日超清壁纸
+TVBox 聚合源自动更新（终极定制版 - 集成 jsDelivr 智能还原）
+- 1. 【新增】jsDelivr 智能还原转换：将 cdn/fastly/gcore.jsdelivr.net/gh/user/repo@branch/path
+     统一还原并转换为标准的 https://gh-proxy.com/https://raw.githubusercontent.com/...
+- 2. 精品版 (tvbox.json / 根路径 /)：精选 120 站 (95 个低延迟高清爬虫 + 25 个实测极速采集) + 10 个最快直播源
+- 3. 全量版 (tvbox_full.json / 路径 /all)：1300+ 站点超大海量全收录，无任何数量限制
+- 4. 智能 GitHub 代理清洗：剥离任何套娃加速前缀，标准化为单层 gh-proxy.com
+- 5. 爬虫站专属 Jar 继承 + 去广告 rules/flags 完整保留 + 阿里 DoH 防劫持 + 超清壁纸
 """
 import json
 import sys
@@ -23,16 +21,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 WORK_DIR = os.path.dirname(os.path.abspath(__file__))
 CF_PROXY = os.environ.get("CF_PROXY", "").rstrip("/")  # Cloudflare Worker 代理地址
-MAX_FULL_SITES = 0  # 全量版站点保留上限（推荐 100-150，防止电视盒子 OOM 崩溃）
+BOUTIQUE_LIMIT = 120  # 精品版固定凑齐 120 个最强源
+BOUTIQUE_LIVES_LIMIT = 10  # 精品版只取 10 个最快的直播源
 
 
 def gh_proxy_url(url):
     """
-    智能 GitHub 代理清洗器：
-    1. 自动剥离前面任何自定义加速域名（down.nigx.cn、ghfast.top、套娃 gh-proxy 等）
-    2. 提取出纯粹的 raw.githubusercontent.com 或 github.com 目标
-    3. 规范化组装为单一的 https://gh-proxy.com/ 代理，并保留原有 ;md5; 校验
-    4. 非 GitHub 链接原样保留，绝不误伤
+    智能 GitHub 代理清洗转换器：
+    1. 自动将各类 jsdelivr 镜像 (cdn/fastly/gcore.jsdelivr.net/gh/user/repo@branch/path)
+       还原并标准化为 https://gh-proxy.com/https://raw.githubusercontent.com/...
+    2. 自动剥离第三方套娃加速域名（down.nigx.cn、ghfast.top、重复套娃 gh-proxy 等）
+    3. 保留原有 ;md5; 校验
+    4. 非 GitHub 链接原样保留
     """
     if not isinstance(url, str) or not url.startswith("http"):
         return url
@@ -43,13 +43,22 @@ def gh_proxy_url(url):
         url, md5_val = parts[0], parts[1]
         md5_suffix = f";md5;{md5_val}"
 
-    # 匹配目标：提取真正的 GitHub 资源路径
+    # 1. 识别并转换各类 jsDelivr 格式: /gh/user/repo@branch/path 或 /gh/user/repo/path
+    m_jsd = re.search(r'https?://(?:[\w-]+\.)?jsdelivr\.net/gh/([^/@]+)/([^/@]+)(?:@([^/]+))?/(.+)', url)
+    if m_jsd:
+        user = m_jsd.group(1)
+        repo = m_jsd.group(2)
+        branch = m_jsd.group(3) or "master"
+        path = m_jsd.group(4)
+        raw_target = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/{path}"
+        return f"https://gh-proxy.com/{raw_target}{md5_suffix}"
+
+    # 2. 匹配并提取纯粹的 GitHub 根路径（剥离任何套娃前缀）
     m = re.search(r'((?:https?://)?(?:raw\.githubusercontent\.com|github\.com)/[^\s"\';]+)', url)
     if m:
         raw_target = m.group(1)
         if not raw_target.startswith("http"):
             raw_target = "https://" + raw_target
-        # 统一标准化为规范的单层 gh-proxy.com 代理
         return f"https://gh-proxy.com/{raw_target}{md5_suffix}"
     
     return f"{url}{md5_suffix}"
@@ -255,7 +264,7 @@ def _worker_test_speed(item):
 
 def main():
     ts = time.strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{ts}] 开始执行 TVBox 全量旗舰版源更新...")
+    print(f"[{ts}] 开始执行 TVBox 聚合更新...")
 
     # ── 1. 获取源列表 ──
     html = curl("https://tvbox.clbug.com/user.php", 20)
@@ -289,13 +298,14 @@ def main():
     available.sort(key=lambda x: x[2])
     print(f"  可用源数量: {len(available)}")
 
-    # ── 3. 抓取、精确排重与合并 ──
-    all_sites, all_lives, all_parses = [], [], []
+    # ── 3. 抓取、合并与收集 ──
+    all_sites, all_parses = [], []
     all_rules, all_flags = [], []
     site_keys, seen_collect_hosts, live_keys = set(), set(), set()
     rule_keys, flag_keys = set(), set()
     spider_jars = {}
     collect_sources = {}
+    all_lives_with_lat = []  # 记录带有来源延迟的直播列表
 
     for name, url, lat in available:
         sys.stdout.write(f"\r  合并源: {name} ({lat}ms)")
@@ -319,7 +329,7 @@ def main():
             if not key or key in site_keys:
                 continue
 
-            # 域名排重仅针对 CMS 采集站(type 0/1)，杜绝误杀共享域名的爬虫站(type 3)
+            # 域名排重仅针对 CMS 采集站(type 0/1)
             if st in (0, 1) and isinstance(api, str) and api.startswith("http"):
                 api_host = urlparse(api).netloc.lower()
                 if api_host in seen_collect_hosts:
@@ -334,7 +344,7 @@ def main():
             if st == 3 and not s.get("jar") and abs_spider:
                 s["jar"] = abs_spider
 
-            # 严谨判定相对路径文件（防参数误伤）+ 智能代理清洗
+            # 相对路径修复 + jsDelivr / GitHub 代理清洗
             ext = s.get("ext", "")
             if isinstance(ext, str) and ext:
                 is_rel_file = ext.startswith(("./", "../", "/")) or (
@@ -346,7 +356,6 @@ def main():
                     ext = resolve_url(url, ext)
                 s["ext"] = gh_proxy_url(ext)
 
-            # 站点自身的 jar 和 api 自动清洗代理
             if s.get("jar"):
                 s["jar"] = gh_proxy_url(s["jar"])
             if isinstance(api, str) and api.startswith("http"):
@@ -354,18 +363,18 @@ def main():
 
             all_sites.append(s)
 
-            # 收集待测速采集站（必须基于原始 api 路径测速）
+            # 收集待测速采集站
             if st in (0, 1) and isinstance(api, str) and api.startswith("http") and api not in collect_sources:
                 collect_sources[api] = (name, st)
 
-        # 合并直播源（清洗多层套娃代理）
+        # 收集直播源并记录其所属源的延迟（用于精品版选最快 10 个直播源）
         for l in (data.get("lives") or []):
             u = l.get("url", "") if isinstance(l, dict) else ""
             if u and u not in live_keys:
                 live_keys.add(u)
-                if isinstance(l, dict):
-                    l["url"] = gh_proxy_url(u)
-                all_lives.append(l)
+                l_copy = dict(l) if isinstance(l, dict) else {"url": u}
+                l_copy["url"] = gh_proxy_url(u)
+                all_lives_with_lat.append((lat, l_copy))
 
         # 收集解析线路
         for p in (data.get("parses") or []):
@@ -401,7 +410,7 @@ def main():
             sys.stdout.flush()
     print()
 
-    # 排序：速度降序，延迟升序
+    # 测速排序：速度降序，延迟升序
     collect_results.sort(key=lambda x: (-x[1], x[0]))
 
     # 置顶规则：索尼、360
@@ -422,8 +431,7 @@ def main():
 
     speed_map = {api: (ttfb, speed) for ttfb, speed, api, _ in collect_results}
 
-    # 【死链清洗】：采集站只保留测速成功的
-    valid_sites = []
+    # 全量版站点保留（全部保留，包括未测速或失败的采集站，保证 1300+ 站不流失）
     for s in all_sites:
         st = s.get("type", -1)
         api = s.get("api", "")
@@ -433,23 +441,23 @@ def main():
                 res_tuple = speed_map.get(api) or speed_map.get(orig_api)
                 s["_speed"] = res_tuple[1]
                 s["_speed_ttfb"] = res_tuple[0]
-                valid_sites.append(s)
-        else:
-            valid_sites.append(s)
+            else:
+                s["_speed"] = 0
+                s["_speed_ttfb"] = 99999
 
-    # 排序：采集站优先按播放速度，爬虫站按源延迟
+    # 全量排序：采集站按速度，爬虫站按源延迟
     def full_sort_key(s):
         st = s.get("type", -1)
         if st in (0, 1):
             return (0, -s.get("_speed", 0), s.get("_speed_ttfb", 99999), s.get("_lat", 99999))
         return (1, 0, 0, s.get("_lat", 99999))
 
-    valid_sites.sort(key=full_sort_key)
+    all_sites.sort(key=full_sort_key)
 
-    # 置顶索尼、360
+    # 全量置顶置前
     pinned_sites = [[] for _ in PINNED_APIS]
     other_collect, other_sites = [], []
-    for s in valid_sites:
+    for s in all_sites:
         if s.get("type") not in (0, 1):
             other_sites.append(s)
             continue
@@ -462,17 +470,17 @@ def main():
                 break
         if not placed:
             other_collect.append(s)
-    ordered_sites = [x for group in pinned_sites for x in group] + other_collect + other_sites
+    ordered_all_sites = [x for group in pinned_sites for x in group] + other_collect + other_sites
 
-    # 分级搜索优化：前 25 个站启用快速聚合搜索
-    for idx, s in enumerate(ordered_sites):
+    # 全量版搜索策略：前 25 站开快速搜索，其余关闭防卡死
+    for idx, s in enumerate(ordered_all_sites):
         s["searchable"] = 1
         s["quickSearch"] = 1 if idx < 25 else 0
         s.pop("_lat", None)
         s.pop("_speed", None)
         s.pop("_speed_ttfb", None)
 
-    # ── 5. 解析接口深度去重与优化 ──
+    # ── 5. 解析接口 (parses) 深度去重 ──
     clean_parses = []
     seen_parse_urls = set()
     for p in all_parses:
@@ -484,32 +492,87 @@ def main():
             if not p_copy.get("name"):
                 p_copy["name"] = f"解析线路{len(clean_parses)+1}"
             clean_parses.append(p_copy)
-    # JSON解析/并发解析靠前 (type 1/2/3)，精选前 15 条
     clean_parses.sort(key=lambda x: 0 if x.get("type") in (1, 2, 3) else 1)
     clean_parses = clean_parses[:15]
 
-    # ── 6. 生成 tvbox_full.json（全量旗舰版）──
+    # 直播源：全量直播 vs 精品 10 个最快直播
+    all_lives_with_lat.sort(key=lambda x: x[0])  # 按来源延迟由低到高排序
+    boutique_lives = [l for lat, l in all_lives_with_lat[:BOUTIQUE_LIVES_LIMIT]]
+    full_lives = [l for lat, l in all_lives_with_lat]
+
     best_spider = max(spider_jars, key=spider_jars.get) if spider_jars else ""
     best_spider = gh_proxy_url(best_spider)
-    final_full_sites = ordered_sites[:MAX_FULL_SITES] if (MAX_FULL_SITES and MAX_FULL_SITES > 0) else ordered_sites
 
+    # ── 6. 生成 tvbox.json（精品主力版，默认根路径 / 访问）──
+    # 策略：前 25 个最快采集站 + 前 95 个最低延迟优质爬虫站 = 刚好凑满 120 站
+    top_cms_sites = []
+    for idx, (ttfb, speed, api, stype) in enumerate(collect_results[:25], 1):
+        clean_name = urlparse(api).netloc or f"采集站{idx}"
+        for s in all_sites:
+            if s.get("api") == api or s.get("api") == gh_proxy_url(api):
+                clean_name = re.sub(r'^\[.*?\]\s*', '', s.get("name", clean_name))
+                break
+        stable = "稳" if speed > 500 else "中" if speed > 100 else "慢"
+        top_cms_sites.append({
+            "key": f"c_{idx}_{clean_name}",
+            "name": f"[{speed}KB/s|{stable}] {clean_name}",
+            "type": stype,
+            "api": gh_proxy_url(api),
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 0
+        })
+
+    needed_spiders = BOUTIQUE_LIMIT - len(top_cms_sites)  # 需要补充的爬虫站数量 (95个)
+    top_spider_sites = []
+    for s in ordered_all_sites:
+        if s.get("type") == 3:
+            s_copy = dict(s)
+            s_copy["quickSearch"] = 1  # 精品版全部开启快速搜索
+            s_copy["searchable"] = 1
+            top_spider_sites.append(s_copy)
+            if len(top_spider_sites) >= needed_spiders:
+                break
+
+    # 优质爬虫排最前享受 4K 秒播，最快采集站紧随其后作为兜底
+    boutique_sites = top_spider_sites + top_cms_sites
+
+    boutique_json = {
+        "spider": best_spider,
+        "wallpaper": "https://bing.img.run/rand_uhd.php",
+        "doh": [
+            {"name": "AliDNS", "url": "https://dns.alidns.com/dns-query", "ips": ["223.5.5.5", "223.6.6.6"]}
+        ],
+        "sites": boutique_sites,
+        "lives": boutique_lives,     # 精选 10 个最快直播源
+        "parses": clean_parses[:8],
+        "rules": all_rules,
+        "flags": all_flags
+    }
+    with open(os.path.join(WORK_DIR, "tvbox.json"), "w", encoding="utf-8") as f:
+        json.dump(boutique_json, f, ensure_ascii=False, indent=2)
+    print(f"  [精品主力版] 输出完成 (tvbox.json): 凑满 {len(boutique_sites)} 站 (优质爬虫:{len(top_spider_sites)} 采集:{len(top_cms_sites)}) + 精选 {len(boutique_lives)} 个最快直播源")
+
+    # ── 7. 生成 tvbox_full.json / tvbox_all.json（全量版，路径 /all 访问）──
     full_json = {
         "spider": best_spider,
         "wallpaper": "https://bing.img.run/rand_uhd.php",
         "doh": [
             {"name": "AliDNS", "url": "https://dns.alidns.com/dns-query", "ips": ["223.5.5.5", "223.6.6.6"]}
         ],
-        "sites": final_full_sites,
-        "lives": all_lives,
+        "sites": ordered_all_sites,
+        "lives": full_lives,
         "parses": clean_parses,
         "rules": all_rules,
         "flags": all_flags
     }
     with open(os.path.join(WORK_DIR, "tvbox_full.json"), "w", encoding="utf-8") as f:
         json.dump(full_json, f, ensure_ascii=False, indent=2)
-    print(f"  全量旗舰版输出完成: 包含 {len(final_full_sites)} 个精炼站点 (rules: {len(all_rules)} 条, 解析: {len(clean_parses)} 条)")
+    with open(os.path.join(WORK_DIR, "tvbox_all.json"), "w", encoding="utf-8") as f:
+        json.dump(full_json, f, ensure_ascii=False, indent=2)
+    print(f"  [全量版] 输出完成 (tvbox_full.json & tvbox_all.json): 包含全部 {len(ordered_all_sites)} 个站点 + 全量直播")
 
-    # ── 7. 生成 tvbox_multi.json（多仓版）──
+    # ── 8. 生成 tvbox_multi.json（多仓版）──
     pinned_repos = set()
     for api_key in collect_sources:
         for kw in PINNED_APIS:
@@ -523,40 +586,7 @@ def main():
     }
     with open(os.path.join(WORK_DIR, "tvbox_multi.json"), "w", encoding="utf-8") as f:
         json.dump(multi, f, ensure_ascii=False, indent=2)
-    print(f"  多仓版输出完成: {len(available)} 个独立仓库")
-
-    # ── 8. 生成 tvbox.json（简洁版）──
-    SIMPLE_LIMIT = 10
-    collect_sites = []
-    for idx, (ttfb, speed, api, stype) in enumerate(collect_results[:SIMPLE_LIMIT], 1):
-        clean_name = urlparse(api).netloc or f"采集站{idx}"
-        for s in all_sites:
-            if s.get("api") == api or s.get("api") == gh_proxy_url(api):
-                clean_name = re.sub(r'^\[.*?\]\s*', '', s.get("name", clean_name))
-                break
-        stable = "稳" if speed > 500 else "中" if speed > 100 else "慢"
-        
-        collect_sites.append({
-            "key": f"c_{idx}_{clean_name}",
-            "name": f"[{speed}KB/s|{ttfb}ms|{stable}] {clean_name}",
-            "type": stype,
-            "api": gh_proxy_url(api),
-            "searchable": 1,
-            "quickSearch": 1,
-            "filterable": 0
-        })
-
-    collect_json = {
-        "spider": "",
-        "wallpaper": "https://bing.img.run/rand_uhd.php",
-        "sites": collect_sites,
-        "lives": [],
-        "parses": clean_parses[:5],
-        "rules": all_rules
-    }
-    with open(os.path.join(WORK_DIR, "tvbox.json"), "w", encoding="utf-8") as f:
-        json.dump(collect_json, f, ensure_ascii=False, indent=2)
-    print(f"  简洁版输出完成: 固定最快 {len(collect_sites)} 站")
+    print(f"  [多仓版] 输出完成 (tvbox_multi.json): {len(available)} 个独立仓库")
 
     # ── 9. 写入 sources.txt 记录 ──
     with open(os.path.join(WORK_DIR, "sources.txt"), "w", encoding="utf-8") as f:
@@ -564,7 +594,7 @@ def main():
         for name, url, lat in available:
             f.write(f"[{lat}ms] {name}\n{url}\n\n")
 
-    print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 任务顺利完成！")
+    print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 所有规格全量更新完成！")
     return 0
 
 
