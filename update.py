@@ -186,6 +186,9 @@ def main():
             site_keys.add(key)
             s["name"] = f"[{lat}ms|{name}] {s.get('name', key)}"
             s["_lat"] = lat
+            # 【核心修复】：如果是爬虫站(type 3)且站点本身没有指定jar，自动继承原仓库的专属jar
+            if s.get("type") == 3 and not s.get("jar") and spider:
+                s["jar"] = abs_spider
             all_sites.append(s)
             # 记录采集站
             st = s.get("type", -1)
