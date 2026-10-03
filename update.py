@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TVBox 聚合源自动更新（终极无Bug版）
-- 1. 【Bug修复】域名排重仅作用于采集站(type 0/1)，杜绝误杀 gh-proxy 托管的 JS 爬虫站
-- 2. 【Bug修复】严谨识别 ext 相对文件路径，防止普通参数字符串被误拼接
-- 3. 【Bug修复】多线程测速子任务增加全局异常隔离，保证主进程永不崩溃
-- 4. 【Bug修复】简洁版站点 key 保证绝对唯一，防止 TVBox 内部同名覆盖
-- 5. 全局 GitHub 资源智能代理加速（ext/jar/spider/lives/parses）
+TVBox 聚合源自动更新（终极无Bug版 - 智能代理清洗重构）
+- 1. 【重构代理算法】精准提取 GitHub 根路径，自动剥离任何第三方套娃加速域名，统一标准化为 gh-proxy.com
+- 2. 域名排重仅作用于采集站(type 0/1)，杜绝误杀共享域名的 JS 爬虫站
+- 3. 严谨识别 ext 相对文件路径，防止普通参数字符串被误拼接
+- 4. 多线程测速子任务增加全局异常隔离，保证主进程永不崩溃
+- 5. 简洁版站点 key 保证绝对唯一，防止 TVBox 内部同名覆盖
 - 6. 爬虫站专属 Jar 继承 + 去广告 rules/flags 完整保留
 - 7. 前 25 优质站分级聚合搜索，彻底解决电视端搜片卡顿
 - 8. 过滤无用死链采集站，内置阿里 DoH + Bing 每日超清壁纸
@@ -27,23 +27,32 @@ MAX_FULL_SITES = 120  # 全量版站点保留上限（推荐 100-150，防止电
 
 
 def gh_proxy_url(url):
-    """自动将裸奔的 GitHub 链接转换为国内可用加速镜像，支持保留 ;md5; 校验"""
+    """
+    智能 GitHub 代理清洗器：
+    1. 自动剥离前面任何自定义加速域名（down.nigx.cn、ghfast.top、套娃 gh-proxy 等）
+    2. 提取出纯粹的 raw.githubusercontent.com 或 github.com 目标
+    3. 规范化组装为单一的 https://gh-proxy.com/ 代理，并保留原有 ;md5; 校验
+    4. 非 GitHub 链接原样保留，绝不误伤
+    """
     if not isinstance(url, str) or not url.startswith("http"):
         return url
     
     md5_suffix = ""
     if ";md5;" in url:
         parts = url.split(";md5;", 1)
-        base_url, md5_val = parts[0], parts[1]
+        url, md5_val = parts[0], parts[1]
         md5_suffix = f";md5;{md5_val}"
-    else:
-        base_url = url
 
-    if ("github.com" in base_url or "raw.githubusercontent.com" in base_url) and not any(
-        p in base_url for p in ["gh-proxy", "ghproxy", "fastgit", "jsdelivr"]
-    ):
-        return f"https://gh-proxy.com/{base_url}{md5_suffix}"
-    return url
+    # 匹配目标：提取真正的 GitHub 资源路径
+    m = re.search(r'((?:https?://)?(?:raw\.githubusercontent\.com|github\.com)/[^\s"\';]+)', url)
+    if m:
+        raw_target = m.group(1)
+        if not raw_target.startswith("http"):
+            raw_target = "https://" + raw_target
+        # 统一标准化为规范的单层 gh-proxy.com 代理
+        return f"https://gh-proxy.com/{raw_target}{md5_suffix}"
+    
+    return f"{url}{md5_suffix}"
 
 
 def curl(url, timeout=10, via_proxy=False):
@@ -229,7 +238,7 @@ def test_play_speed(api, stype, use_proxy=False):
 
 
 def _worker_test_speed(item):
-    """【Bug 3 修复】增加全局异常捕获，确保单站故障绝不影响全局任务"""
+    """增加全局异常捕获，确保单站故障绝不影响全局任务"""
     api, (src_name, stype) = item
     try:
         for attempt in range(2):
@@ -310,7 +319,7 @@ def main():
             if not key or key in site_keys:
                 continue
 
-            # 【Bug 1 修复】：域名排重仅针对 CMS 采集站(type 0/1)，绝不误伤共享域名的爬虫站(type 3)
+            # 域名排重仅针对 CMS 采集站(type 0/1)，杜绝误杀共享域名的爬虫站(type 3)
             if st in (0, 1) and isinstance(api, str) and api.startswith("http"):
                 api_host = urlparse(api).netloc.lower()
                 if api_host in seen_collect_hosts:
@@ -325,7 +334,7 @@ def main():
             if st == 3 and not s.get("jar") and abs_spider:
                 s["jar"] = abs_spider
 
-            # 【Bug 2 修复】：严谨判定相对路径文件（防参数误伤）+ GitHub 加速
+            # 严谨判定相对路径文件（防参数误伤）+ 智能代理清洗
             ext = s.get("ext", "")
             if isinstance(ext, str) and ext:
                 is_rel_file = ext.startswith(("./", "../", "/")) or (
@@ -337,7 +346,7 @@ def main():
                     ext = resolve_url(url, ext)
                 s["ext"] = gh_proxy_url(ext)
 
-            # 站点自身的 jar 和 api 自动加速
+            # 站点自身的 jar 和 api 自动清洗代理
             if s.get("jar"):
                 s["jar"] = gh_proxy_url(s["jar"])
             if isinstance(api, str) and api.startswith("http"):
@@ -349,7 +358,7 @@ def main():
             if st in (0, 1) and isinstance(api, str) and api.startswith("http") and api not in collect_sources:
                 collect_sources[api] = (name, st)
 
-        # 合并直播源
+        # 合并直播源（清洗多层套娃代理）
         for l in (data.get("lives") or []):
             u = l.get("url", "") if isinstance(l, dict) else ""
             if u and u not in live_keys:
@@ -418,7 +427,6 @@ def main():
     for s in all_sites:
         st = s.get("type", -1)
         api = s.get("api", "")
-        # 兼容代理后的 api 或原始 api 匹配
         orig_api = re.sub(r'^https://gh-proxy\.com/', '', api)
         if st in (0, 1):
             if api in speed_map or orig_api in speed_map:
@@ -528,7 +536,6 @@ def main():
                 break
         stable = "稳" if speed > 500 else "中" if speed > 100 else "慢"
         
-        # 【Bug 4 修复】：为 key 增加唯一序号前缀，保证在 TVBox 内部绝对不冲突
         collect_sites.append({
             "key": f"c_{idx}_{clean_name}",
             "name": f"[{speed}KB/s|{ttfb}ms|{stable}] {clean_name}",
