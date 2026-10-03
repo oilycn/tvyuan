@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TVBox 聚合源自动更新（个人全量旗舰定制版 + GitHub 国内智能加速）
-- 1. 【新增】全局 GitHub 加速：自动将 ext/jar/spider/lives/parses 中的 GitHub 链接转为国内高速代理
-- 2. 爬虫站(type 3)自动继承专属 Jar，彻底解决 ClassNotFound
-- 3. 自动将站点 ext 相对路径补全为绝对 URL
-- 4. 全量保留并合并去广告规则 (rules) 与解码标识 (flags)
-- 5. 增强 JSON 容错（过滤 // 与 /* */ 注释）
-- 6. 域名级深度排重（彻底解决红牛、量子等镜像站重复刷屏）
-- 7. 剔除死链采集站（仅收纳真实播放测速通过的有效源）
-- 8. 分级聚合搜索（前 25 个最快站开启快速搜索，避免电视搜片卡死十几秒）
-- 9. 解析线路优化（优先排布 JSON 快速解析，最多精选 15 条）
-- 10. 内置阿里 DoH 防宽带劫持 + Bing 每日超清壁纸
-- 11. 8 线程并发测速，2 分钟内极速完成更新
+TVBox 聚合源自动更新（终极无Bug版）
+- 1. 【Bug修复】域名排重仅作用于采集站(type 0/1)，杜绝误杀 gh-proxy 托管的 JS 爬虫站
+- 2. 【Bug修复】严谨识别 ext 相对文件路径，防止普通参数字符串被误拼接
+- 3. 【Bug修复】多线程测速子任务增加全局异常隔离，保证主进程永不崩溃
+- 4. 【Bug修复】简洁版站点 key 保证绝对唯一，防止 TVBox 内部同名覆盖
+- 5. 全局 GitHub 资源智能代理加速（ext/jar/spider/lives/parses）
+- 6. 爬虫站专属 Jar 继承 + 去广告 rules/flags 完整保留
+- 7. 前 25 优质站分级聚合搜索，彻底解决电视端搜片卡顿
+- 8. 过滤无用死链采集站，内置阿里 DoH + Bing 每日超清壁纸
 """
 import json
 import sys
@@ -26,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 WORK_DIR = os.path.dirname(os.path.abspath(__file__))
 CF_PROXY = os.environ.get("CF_PROXY", "").rstrip("/")  # Cloudflare Worker 代理地址
-MAX_FULL_SITES = 120  # 全量版站点保留上限（推荐 100-150，防止电视盒子 OOM 内存溢出）
+MAX_FULL_SITES = 120  # 全量版站点保留上限（推荐 100-150，防止电视盒子 OOM 崩溃）
 
 
 def gh_proxy_url(url):
@@ -42,7 +39,6 @@ def gh_proxy_url(url):
     else:
         base_url = url
 
-    # 如果是 GitHub 链接且尚未包裹任何代理
     if ("github.com" in base_url or "raw.githubusercontent.com" in base_url) and not any(
         p in base_url for p in ["gh-proxy", "ghproxy", "fastgit", "jsdelivr"]
     ):
@@ -69,11 +65,8 @@ def parse_json(raw):
     if not raw or not raw.strip():
         return None
     raw = raw.lstrip('\ufeff')
-    # 过滤单行注释（避免误伤 http://）
     raw = re.sub(r'(?<!:)\/\/.*$', '', raw, flags=re.MULTILINE)
-    # 过滤多行注释
     raw = re.sub(r'\/\*[\s\S]*?\*\/', '', raw)
-    # 去除尾逗号
     raw = re.sub(r',(\s*[}\]])', r'\1', raw)
     try:
         return json.loads(raw, strict=False)
@@ -135,7 +128,8 @@ def get_segments(media, media_url):
 
 
 def build_url(base, params):
-    return base.rstrip("/") + ("&" if "?" in base else "?") + params
+    clean_base = base.rstrip("?&/")
+    return clean_base + ("&" if "?" in clean_base else "?") + params
 
 
 def test_play_speed(api, stype, use_proxy=False):
@@ -235,15 +229,18 @@ def test_play_speed(api, stype, use_proxy=False):
 
 
 def _worker_test_speed(item):
-    """单个采集站的测试任务"""
+    """【Bug 3 修复】增加全局异常捕获，确保单站故障绝不影响全局任务"""
     api, (src_name, stype) = item
-    for attempt in range(2):
-        use_proxy = (attempt == 1 and bool(CF_PROXY))
-        ttfb, speed, st = test_play_speed(api, stype, use_proxy=use_proxy)
-        if st == "OK":
-            return (ttfb, speed, api, stype)
-        if attempt < 1:
-            time.sleep(1)
+    try:
+        for attempt in range(2):
+            use_proxy = (attempt == 1 and bool(CF_PROXY))
+            ttfb, speed, st = test_play_speed(api, stype, use_proxy=use_proxy)
+            if st == "OK":
+                return (ttfb, speed, api, stype)
+            if attempt < 1:
+                time.sleep(1)
+    except Exception:
+        pass
     return None
 
 
@@ -283,10 +280,10 @@ def main():
     available.sort(key=lambda x: x[2])
     print(f"  可用源数量: {len(available)}")
 
-    # ── 3. 抓取、域名排重与合并 ──
+    # ── 3. 抓取、精确排重与合并 ──
     all_sites, all_lives, all_parses = [], [], []
     all_rules, all_flags = [], []
-    site_keys, seen_api_hosts, live_keys = set(), set(), set()
+    site_keys, seen_collect_hosts, live_keys = set(), set(), set()
     rule_keys, flag_keys = set(), set()
     spider_jars = {}
     collect_sources = {}
@@ -308,31 +305,39 @@ def main():
                 continue
             key = s.get("key", "")
             api = s.get("api", "")
+            st = s.get("type", -1)
 
-            # 【排重优化】：基于 Key 和 API 域名双重去重，彻底消灭重复采集站
-            api_host = urlparse(api).netloc if (isinstance(api, str) and api.startswith("http")) else ""
-            if not key or key in site_keys or (api_host and api_host in seen_api_hosts):
+            if not key or key in site_keys:
                 continue
 
-            site_keys.add(key)
-            if api_host:
-                seen_api_hosts.add(api_host)
+            # 【Bug 1 修复】：域名排重仅针对 CMS 采集站(type 0/1)，绝不误伤共享域名的爬虫站(type 3)
+            if st in (0, 1) and isinstance(api, str) and api.startswith("http"):
+                api_host = urlparse(api).netloc.lower()
+                if api_host in seen_collect_hosts:
+                    continue
+                seen_collect_hosts.add(api_host)
 
+            site_keys.add(key)
             s["name"] = f"[{lat}ms|{name}] {s.get('name', key)}"
             s["_lat"] = lat
 
-            # 【核心修复 1】：爬虫站 (type 3) 继承所属源的专属 Jar
-            if s.get("type") == 3 and not s.get("jar") and abs_spider:
+            # 爬虫站继承专属 Jar
+            if st == 3 and not s.get("jar") and abs_spider:
                 s["jar"] = abs_spider
 
-            # 【核心修复 2】：自动修复 ext 相对路径 + GitHub 国内加速
+            # 【Bug 2 修复】：严谨判定相对路径文件（防参数误伤）+ GitHub 加速
             ext = s.get("ext", "")
             if isinstance(ext, str) and ext:
-                if ext.startswith("./") or (not ext.startswith(("http://", "https://", "clan://", "{", "[")) and not "\n" in ext and ("." in ext or "/" in ext)):
+                is_rel_file = ext.startswith(("./", "../", "/")) or (
+                    not ext.startswith(("http://", "https://", "clan://", "push://", "file://", "{", "["))
+                    and not "\n" in ext
+                    and ext.endswith((".json", ".txt", ".js", ".jar", ".bin", ".py"))
+                )
+                if is_rel_file:
                     ext = resolve_url(url, ext)
                 s["ext"] = gh_proxy_url(ext)
 
-            # 【核心修复 3】：自动加速站点本身的 jar 和 api 属性（如果指向 GitHub）
+            # 站点自身的 jar 和 api 自动加速
             if s.get("jar"):
                 s["jar"] = gh_proxy_url(s["jar"])
             if isinstance(api, str) and api.startswith("http"):
@@ -340,12 +345,11 @@ def main():
 
             all_sites.append(s)
 
-            # 收集待测速采集站
-            st = s.get("type", -1)
-            if st in (0, 1) and api_host and api not in collect_sources:
+            # 收集待测速采集站（必须基于原始 api 路径测速）
+            if st in (0, 1) and isinstance(api, str) and api.startswith("http") and api not in collect_sources:
                 collect_sources[api] = (name, st)
 
-        # 合并直播源（附带 GitHub 加速）
+        # 合并直播源
         for l in (data.get("lives") or []):
             u = l.get("url", "") if isinstance(l, dict) else ""
             if u and u not in live_keys:
@@ -354,12 +358,12 @@ def main():
                     l["url"] = gh_proxy_url(u)
                 all_lives.append(l)
 
-        # 收集解析线路（附带 GitHub 加速）
+        # 收集解析线路
         for p in (data.get("parses") or []):
             if isinstance(p, dict) and p.get("url"):
                 all_parses.append(p)
 
-        # 合并去广告规则 rules 与解码器 flags
+        # 合并去广告规则与解码标识
         for r in (data.get("rules") or []):
             rk = r.get("name") if isinstance(r, dict) else str(r)
             if rk and rk not in rule_keys:
@@ -384,11 +388,11 @@ def main():
             res = fut.result()
             if res:
                 collect_results.append(res)
-            sys.stdout.write(f"\r  测速进度: {completed}/{total} (有效站: {len(collect_results)})")
+            sys.stdout.write(f"\r  测速进度: {completed}/{total} (有效可用: {len(collect_results)})")
             sys.stdout.flush()
     print()
 
-    # 速度降序，延迟升序
+    # 排序：速度降序，延迟升序
     collect_results.sort(key=lambda x: (-x[1], x[0]))
 
     # 置顶规则：索尼、360
@@ -409,18 +413,20 @@ def main():
 
     speed_map = {api: (ttfb, speed) for ttfb, speed, api, _ in collect_results}
 
-    # 【死链清洗】：采集站只有测速成功的才进入全量版，超时的死站直接丢弃
+    # 【死链清洗】：采集站只保留测速成功的
     valid_sites = []
     for s in all_sites:
         st = s.get("type", -1)
         api = s.get("api", "")
+        # 兼容代理后的 api 或原始 api 匹配
+        orig_api = re.sub(r'^https://gh-proxy\.com/', '', api)
         if st in (0, 1):
-            if api in speed_map:
-                s["_speed"] = speed_map[api][1]
-                s["_speed_ttfb"] = speed_map[api][0]
+            if api in speed_map or orig_api in speed_map:
+                res_tuple = speed_map.get(api) or speed_map.get(orig_api)
+                s["_speed"] = res_tuple[1]
+                s["_speed_ttfb"] = res_tuple[0]
                 valid_sites.append(s)
         else:
-            # 爬虫站保留
             valid_sites.append(s)
 
     # 排序：采集站优先按播放速度，爬虫站按源延迟
@@ -432,7 +438,7 @@ def main():
 
     valid_sites.sort(key=full_sort_key)
 
-    # 置顶索尼、360 到采集站最前
+    # 置顶索尼、360
     pinned_sites = [[] for _ in PINNED_APIS]
     other_collect, other_sites = [], []
     for s in valid_sites:
@@ -450,7 +456,7 @@ def main():
             other_collect.append(s)
     ordered_sites = [x for group in pinned_sites for x in group] + other_collect + other_sites
 
-    # 【分级搜索优化】：前 25 个站启用快速聚合搜索；后面的站只允许单站搜索，避免电视搜片卡死！
+    # 分级搜索优化：前 25 个站启用快速聚合搜索
     for idx, s in enumerate(ordered_sites):
         s["searchable"] = 1
         s["quickSearch"] = 1 if idx < 25 else 0
@@ -458,17 +464,20 @@ def main():
         s.pop("_speed", None)
         s.pop("_speed_ttfb", None)
 
-    # ── 5. 解析接口 (parses) 深度去重与优化 ──
+    # ── 5. 解析接口深度去重与优化 ──
     clean_parses = []
     seen_parse_urls = set()
     for p in all_parses:
         u = p.get("url", "")
         if u and u not in seen_parse_urls:
             seen_parse_urls.add(u)
-            p["url"] = gh_proxy_url(u)
-            clean_parses.append(p)
-    # 优先排序：type=1 (JSON 快速解析) 靠前，精选前 15 条
-    clean_parses.sort(key=lambda x: 0 if x.get("type") == 1 else 1)
+            p_copy = dict(p)
+            p_copy["url"] = gh_proxy_url(u)
+            if not p_copy.get("name"):
+                p_copy["name"] = f"解析线路{len(clean_parses)+1}"
+            clean_parses.append(p_copy)
+    # JSON解析/并发解析靠前 (type 1/2/3)，精选前 15 条
+    clean_parses.sort(key=lambda x: 0 if x.get("type") in (1, 2, 3) else 1)
     clean_parses = clean_parses[:15]
 
     # ── 6. 生成 tvbox_full.json（全量旗舰版）──
@@ -478,7 +487,7 @@ def main():
 
     full_json = {
         "spider": best_spider,
-        "wallpaper": "https://bing.img.run/rand_uhd.php",  # Bing 每日超清壁纸
+        "wallpaper": "https://bing.img.run/rand_uhd.php",
         "doh": [
             {"name": "AliDNS", "url": "https://dns.alidns.com/dns-query", "ips": ["223.5.5.5", "223.6.6.6"]}
         ],
@@ -490,7 +499,7 @@ def main():
     }
     with open(os.path.join(WORK_DIR, "tvbox_full.json"), "w", encoding="utf-8") as f:
         json.dump(full_json, f, ensure_ascii=False, indent=2)
-    print(f"  全量旗舰版输出完成: 包含 {len(final_full_sites)} 个精炼站点 (保留 rules: {len(all_rules)} 条, 解析: {len(clean_parses)} 条)")
+    print(f"  全量旗舰版输出完成: 包含 {len(final_full_sites)} 个精炼站点 (rules: {len(all_rules)} 条, 解析: {len(clean_parses)} 条)")
 
     # ── 7. 生成 tvbox_multi.json（多仓版）──
     pinned_repos = set()
@@ -511,18 +520,20 @@ def main():
     # ── 8. 生成 tvbox.json（简洁版）──
     SIMPLE_LIMIT = 10
     collect_sites = []
-    for ttfb, speed, api, stype in collect_results[:SIMPLE_LIMIT]:
-        clean_name = api.split("/")[2]
+    for idx, (ttfb, speed, api, stype) in enumerate(collect_results[:SIMPLE_LIMIT], 1):
+        clean_name = urlparse(api).netloc or f"采集站{idx}"
         for s in all_sites:
-            if s.get("api") == api:
+            if s.get("api") == api or s.get("api") == gh_proxy_url(api):
                 clean_name = re.sub(r'^\[.*?\]\s*', '', s.get("name", clean_name))
                 break
         stable = "稳" if speed > 500 else "中" if speed > 100 else "慢"
+        
+        # 【Bug 4 修复】：为 key 增加唯一序号前缀，保证在 TVBox 内部绝对不冲突
         collect_sites.append({
-            "key": clean_name,
+            "key": f"c_{idx}_{clean_name}",
             "name": f"[{speed}KB/s|{ttfb}ms|{stable}] {clean_name}",
             "type": stype,
-            "api": api,
+            "api": gh_proxy_url(api),
             "searchable": 1,
             "quickSearch": 1,
             "filterable": 0
