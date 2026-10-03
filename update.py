@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TVBox 聚合源自动更新（终极智能甄别版）
+TVBox 聚合源自动更新（终极智能甄别 + 本地 Jar 同步 + 私有域名独立加速版）
 - 1. 【强力预淘汰】：测速前直接清洗垃圾占位符（配置中心/本地/预告/说明）、残缺站、死链仓
 - 2. 【Type 3 真实物理测速评分】：并发测试核心 Jar 包真实下载带宽(KB/s)与响应延迟，死 Jar 站点直接淘汰
 - 3. 【口碑大源与4K秒播加权】：主动识别 嗷呜、饭太硬、肥猫、玩偶4K 等顶级大源并推上首页
-- 4. 精品版 (tvbox.json / 根路径 /)：精选 120 站 (95 个高分真实可用高清爬虫 + 25 个实测秒播采集) + 10 最快直播
-- 5. 全量版 (tvbox_full.json / 路径 /all)：1300+ 站点海量全收录，无任何数量限制
-- 6. jsDelivr 智能还原 + 套娃代理清洗，标准化为单层 gh-proxy.com
-- 7. 爬虫站专属 Jar 继承 + api 相对路径补全 + 去广告 rules/flags 保留 + 阿里 DoH
+- 4. 【Jar 自动镜像本地化】：将所有站点的核心 Jar 同步下载到本仓库 ./jars/，通过 tv.gnoix.com/jars/ 提供秒开加速
+- 5. 【专属私有代理加速】：所有 GitHub 外链统一经由自身域名 https://tv.gnoix.com/https://... 加速分发，彻底摆脱第三方
+- 6. 精品版 (tvbox.json / 根路径 /)：精选 120 站 (95 个高分真实可用高清爬虫 + 25 个实测秒播采集) + 10 最快直播
+- 7. 全量版 (tvbox_full.json / 路径 /all)：1300+ 站点海量全收录，无任何数量限制
+- 8. 爬虫站专属 Jar 继承 + api 相对路径补全 + 去广告 rules/flags 保留 + 阿里 DoH
 """
 import json
 import sys
@@ -16,12 +17,17 @@ import re
 import subprocess
 import os
 import time
+import hashlib
 import urllib.parse
 from urllib.parse import urljoin, urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 WORK_DIR = os.path.dirname(os.path.abspath(__file__))
-CF_PROXY = os.environ.get("CF_PROXY", "").rstrip("/")  # Cloudflare Worker 代理地址
+# 私有加速域名（若环境变量未配置则默认使用你的自定义域名）
+MY_HOST = os.environ.get("CF_PROXY", "https://tv.gnoix.com").rstrip("/")
+GH_REPO = os.environ.get("GITHUB_REPOSITORY", "oilycn/tvyuan")  # 当前 GitHub 仓库 (owner/repo)
+GH_BRANCH = "master"  # 默认分支
+JARS_DIR = os.path.join(WORK_DIR, "jars")  # 存放本地同步 Jar 的目录
 BOUTIQUE_LIMIT = 120  # 精品版固定凑齐 120 个最强源
 BOUTIQUE_LIVES_LIMIT = 10  # 精品版只取 10 个最快直播源
 MAX_SPIDERS_PER_SOURCE = 8  # 精品版中单个来源最多允许入选的爬虫站数量（保证多大源百花齐放）
@@ -39,8 +45,128 @@ TOP_TIER_SOURCES = ["aowu", "嗷呜", "fty", "饭太硬", "feimao", "肥猫", "q
 QUALITY_KEYWORDS = ["4k", "秒播", "蓝光", "原画", "玩偶", "木偶", "瓜子", "厂长", "金牌", "秋天", "低端", "libvio", "专线"]
 
 
+def get_safe_download_url(u):
+    """处理包含中文域名或特殊字符的 URL，将其转为合法的 IDN/Punycode 编码"""
+    clean = u.split(";md5;")[0]
+    p = urllib.parse.urlsplit(clean)
+    try:
+        host = p.netloc.encode("idna").decode("ascii")
+    except Exception:
+        host = p.netloc
+    return urllib.parse.urlunsplit((p.scheme, host, urllib.parse.quote(p.path), p.query, p.fragment))
+
+
+def get_jar_storage_name(jar_url):
+    """根据 Jar 的原始路径生成唯一且稳定的本地文件名：[MD5前8位]_[原文件名]"""
+    clean = jar_url.split(";md5;")[0]
+    p = urllib.parse.urlsplit(clean)
+    base_name = os.path.basename(p.path) or "spider.jar"
+    base_name = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', base_name)
+    if not any(base_name.endswith(ext) for ext in ('.jar', '.bin', '.txt', '.png', '.jpg')):
+        base_name += ".jar"
+    h = hashlib.md5(clean.encode("utf-8")).hexdigest()[:8]
+    return f"{h}_{base_name}"
+
+
+def sync_and_localize_jars(site_list, default_spider_url):
+    """
+    【Jar 自动镜像同步模块】：
+    1. 收集入选站点涉及的所有不同 Jar 包（包括默认全局 spider）
+    2. 多线程下载到仓库本地 ./jars/ 目录，持久化保存
+    3. 本地计算权威真实 MD5
+    4. 自动改写站点中的 jar 属性为自己的域名直链: https://tv.gnoix.com/jars/<fname>;md5;<real_md5>
+    """
+    os.makedirs(JARS_DIR, exist_ok=True)
+
+    unique_jars = set()
+    if default_spider_url:
+        unique_jars.add(default_spider_url)
+    for s in site_list:
+        if s.get("jar"):
+            unique_jars.add(s["jar"])
+
+    jar_list = [j for j in unique_jars if j and j.startswith("http")]
+    print(f"\n[Jar 镜像同步] 检测到 {len(jar_list)} 个不同的核心 Jar 包，开始镜像下载与校验...")
+
+    jar_map = {}  # 原始 jar_url -> 本地加速后的私有域名 URL (带真实 md5)
+
+    def _download_single_jar(j_url):
+        fname = get_jar_storage_name(j_url)
+        local_path = os.path.join(JARS_DIR, fname)
+        src_url = get_safe_download_url(j_url)
+
+        downloaded = False
+        temp_target = local_path + ".tmp"
+        curl_cmd = [
+            "curl", "-s", "-L", "--connect-timeout", "6", "--max-time", "25",
+            "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", src_url, "-o", temp_target
+        ]
+        try:
+            subprocess.run(curl_cmd, capture_output=True, timeout=30)
+            if os.path.exists(temp_target) and os.path.getsize(temp_target) > 1024:
+                if os.path.exists(local_path):
+                    os.remove(local_path)
+                os.rename(temp_target, local_path)
+                downloaded = True
+            elif os.path.exists(temp_target):
+                os.remove(temp_target)
+        except Exception:
+            if os.path.exists(temp_target):
+                try: os.remove(temp_target)
+                except Exception: pass
+
+        # 如果直连失败且目标为 github，尝试走自身私有加速代理下载
+        if not downloaded and ("github.com" in src_url or "raw.githubusercontent.com" in src_url):
+            proxy_url = f"{MY_HOST}/{src_url}"
+            curl_cmd2 = [
+                "curl", "-s", "-L", "--connect-timeout", "6", "--max-time", "30",
+                "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", proxy_url, "-o", temp_target
+            ]
+            try:
+                subprocess.run(curl_cmd2, capture_output=True, timeout=35)
+                if os.path.exists(temp_target) and os.path.getsize(temp_target) > 1024:
+                    if os.path.exists(local_path):
+                        os.remove(local_path)
+                    os.rename(temp_target, local_path)
+                    downloaded = True
+                elif os.path.exists(temp_target):
+                    os.remove(temp_target)
+            except Exception:
+                if os.path.exists(temp_target):
+                    try: os.remove(temp_target)
+                    except Exception: pass
+
+        # 最终判断：如果本次下载成功或有历史有效缓存
+        if os.path.exists(local_path) and os.path.getsize(local_path) > 1024:
+            with open(local_path, "rb") as f:
+                real_md5 = hashlib.md5(f.read()).hexdigest()
+            # 直接使用你的域名 /jars/ 路由，简洁、原生且带 Cloudflare 边缘缓存
+            new_url = f"{MY_HOST}/jars/{fname};md5;{real_md5}"
+            status_text = "新同步" if downloaded else "沿用缓存"
+            sz_kb = os.path.getsize(local_path) // 1024
+            return j_url, new_url, f"  [OK] [{status_text}] {fname} ({sz_kb}KB, MD5: {real_md5[:8]}...)"
+        else:
+            return j_url, j_url, f"  [FAIL] 保留原链接: {j_url[:60]}"
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = [ex.submit(_download_single_jar, j) for j in jar_list]
+        for f in as_completed(futures):
+            j_url, new_url, log_msg = f.result()
+            jar_map[j_url] = new_url
+            print(log_msg)
+
+    # 改写 site 列表中的 jar 字段
+    for s in site_list:
+        if s.get("jar") and s["jar"] in jar_map:
+            s["jar"] = jar_map[s["jar"]]
+
+    new_default_spider = jar_map.get(default_spider_url, default_spider_url)
+    print(f"[Jar 镜像同步] 同步完成！所有可用 Jar 已成功托管在当前仓库 ./jars/ 中并通过 {MY_HOST} 加速。\n")
+    return new_default_spider
+
+
 def gh_proxy_url(url):
-    """智能 GitHub 代理清洗转换器：还原 jsDelivr，剥离套娃前缀，标准化为单一代理"""
+    """私有 GitHub 代理转换器：还原 jsDelivr，剥离套娃前缀，标准化为你自己的域名代理"""
     if not isinstance(url, str) or not url.startswith("http"):
         return url
     
@@ -58,22 +184,22 @@ def gh_proxy_url(url):
         branch = m_jsd.group(3) or "master"
         path = m_jsd.group(4)
         raw_target = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/{path}"
-        return f"https://gh-proxy.com/{raw_target}{md5_suffix}"
+        return f"{MY_HOST}/{raw_target}{md5_suffix}"
 
-    # 2. 提取纯粹的 GitHub 根路径并包裹代理
+    # 2. 提取纯粹的 GitHub 根路径并包裹私有代理
     m = re.search(r'((?:https?://)?(?:raw\.githubusercontent\.com|github\.com)/[^\s"\';]+)', url)
     if m:
         raw_target = m.group(1)
         if not raw_target.startswith("http"):
             raw_target = "https://" + raw_target
-        return f"https://gh-proxy.com/{raw_target}{md5_suffix}"
+        return f"{MY_HOST}/{raw_target}{md5_suffix}"
     
     return f"{url}{md5_suffix}"
 
 
 def curl(url, timeout=10, via_proxy=False):
     """带超时控制的 HTTP 请求"""
-    actual_url = f"{CF_PROXY}?u={urllib.parse.quote(url, safe='')}" if (via_proxy and CF_PROXY) else url
+    actual_url = f"{MY_HOST}/{url}" if (via_proxy and MY_HOST) else url
     try:
         r = subprocess.run(
             ["curl", "-s", "-L", "--connect-timeout", str(timeout),
@@ -165,7 +291,6 @@ def test_jar_speed(clean_jar_url):
     """【真实物理测速】：测试核心 Jar 引擎的下载连通性、TTFB 延迟与实测带宽(KB/s)"""
     t0 = time.time()
     try:
-        # 拉取前 128KB 字节分片进行真实吞吐测试
         r = subprocess.run(
             ["curl", "-s", "-r", "0-131071", "-o", "/dev/null", "-w", "%{http_code},%{size_download},%{time_total}",
              "--connect-timeout", "4", "--max-time", "8", "-L", "-A", "Mozilla/5.0", clean_jar_url],
@@ -253,100 +378,73 @@ def test_play_speed(api, stype, use_proxy=False):
             if not segs:
                 continue
 
-            tb, tt, ok = 0, 0, 0
-            for s in segs[:6]:
-                if ok >= 2:
-                    break
-                seg_url = f"{CF_PROXY}?u={urllib.parse.quote(s, safe='')}" if (use_proxy and CF_PROXY) else s
-                try:
-                    r = subprocess.run(
-                        ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code},%{size_download},%{time_total}",
-                         "--connect-timeout", "6", "--max-time", "12", seg_url],
-                        capture_output=True, timeout=15
-                    )
-                    parts = r.stdout.decode().strip().split(",")
-                    code = parts[0] if parts else "000"
-                    sz = int(float(parts[1])) if len(parts) > 1 and parts[1] else 0
-                    dl = float(parts[2]) if len(parts) > 2 and parts[2] else 99
-                    if code.startswith("2") and sz > 1000:
-                        tb += sz
-                        tt += dl
-                        ok += 1
-                except Exception:
-                    continue
+            t2 = time.time()
+            data = curl(segs[0], 10, via_proxy=use_proxy)
+            ts = time.time() - t2
+            sz = len(data.encode("utf-8") if isinstance(data, str) else data)
+            speed = int((sz / 1024) / max(ts, 0.1))
+            if speed > 10:
+                return ttfb + mms, speed, "正常"
 
-            if ok >= 2:
-                speed = int((tb / 1024) / tt) if tt > 0 else 0
-                return ttfb + mms, speed, "OK"
-    return 0, 0, "全部失败"
+    return 0, 0, "下载慢"
 
 
-def _worker_test_speed(item):
-    """单个采集站测试任务"""
-    api, (src_name, stype) = item
-    try:
-        for attempt in range(2):
-            use_proxy = (attempt == 1 and bool(CF_PROXY))
-            ttfb, speed, st = test_play_speed(api, stype, use_proxy=use_proxy)
-            if st == "OK":
-                return (ttfb, speed, api, stype)
-            if attempt < 1:
-                time.sleep(1)
-    except Exception:
-        pass
-    return None
-
+# ─────────────────────────────────────────────────────────────────────────────
+# 主流程
+# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     ts = time.strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{ts}] 开始执行 TVBox 智能甄别版聚合更新...")
+    print(f"[{ts}] TVBox 聚合更新（终极智能甄别 + 私有全加速版）开始...")
 
-    # ── 1. 获取源列表 ──
-    html = curl("https://tvbox.clbug.com/user.php", 20)
-    src_urls = re.findall(r'data-url="([^"]+)"', html)
-    src_names = re.findall(r'<td class="td-name">([^<]+)</td>', html)
-    raw_sources = [(n.strip(), u.strip().replace("&amp;", "&"))
-                   for n, u in zip(src_names, src_urls)
-                   if u.strip() and not u.strip().startswith("#")]
-    print(f"  源列表获取完成: 共 {len(raw_sources)} 个源")
+    # ── 1. 抓取多仓订阅列表 ──
+    print("\n[阶段 1/5] 正在抓取多仓源列表...")
+    user_php = curl("http://tvbox.clbug.com/user.php", 15)
+    if not user_php or len(user_php) < 100:
+        print("  多仓列表获取失败，重试备用拉取...")
+        user_php = curl("http://tvbox.clbug.com/user.php", 20, via_proxy=True)
 
-    # ── 2. 【阶段一：源级预淘汰】探测可用性与快速剔除死链源 ──
+    urls = re.findall(r'https?://[^\s"\'<>]+', user_php)
+    print(f"  原始解析到 {len(urls)} 条链接，开始连通性测试...")
+
+    def check_warehouse(u):
+        t0 = time.time()
+        c = curl(u, 8)
+        lat = int((time.time() - t0) * 1000)
+        if c and len(c) > 50 and any(k in c for k in ["sites", "urls", "storeHouse"]):
+            m = re.search(r'name["\']?\s*:\s*["\']([^"\']+)["\']', c)
+            name = m.group(1).strip() if m else urlparse(u).netloc
+            return (name, u, lat)
+        return None
+
     available = []
-    for name, url in raw_sources:
-        try:
-            t0 = time.time()
-            r = subprocess.run(
-                ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-                 "--connect-timeout", "4", "--max-time", "8",
-                 "-L", "-A", "Mozilla/5.0", url],
-                capture_output=True, timeout=10
-            )
-            code = r.stdout.decode().strip()
-            lat = int((time.time() - t0) * 1000) if code.startswith(("2", "3")) else 99999
-        except Exception:
-            lat = 99999
-        # 超时过长(>5秒)或非正常状态码直接淘汰
-        if lat < 5000:
-            available.append((name, url, lat))
-        sys.stdout.write(f"\r  源级预淘汰进度: {len(available)}/{len(raw_sources)}")
-        sys.stdout.flush()
-    print()
-    available.sort(key=lambda x: x[2])
-    print(f"  初筛可用源数量: {len(available)} 个 (已剔除 {len(raw_sources) - len(available)} 个超时/死链源)")
+    with ThreadPoolExecutor(max_workers=20) as ex:
+        futures = [ex.submit(check_warehouse, u) for u in urls if u.startswith("http")]
+        for f in as_completed(futures):
+            res = f.result()
+            if res:
+                available.append(res)
 
-    # ── 3. 抓取、合并与【阶段二：站点级强力清洗】 ──
-    all_sites, all_parses = [], []
-    all_rules, all_flags = [], []
-    site_keys, seen_collect_hosts, live_keys = set(), set(), set()
-    rule_keys, flag_keys = set(), set()
+    available.sort(key=lambda x: x[2])
+    print(f"  筛选出 {len(available)} 个有效可用仓源！")
+
+    # ── 2. 解析有效源并进行初筛清洗 ──
+    print("\n[阶段 2/5] 深度遍历站点并执行强力预清洗...")
+    all_sites = []
+    site_keys = set()
     spider_jars = {}
     collect_sources = {}
     all_lives_with_lat = []
+    live_keys = set()
+    all_parses = []
+    all_rules = []
+    rule_keys = set()
+    all_flags = []
+    flag_keys = set()
+    seen_collect_hosts = set()
     eliminated_sites_count = 0
 
     for name, url, lat in available:
-        sys.stdout.write(f"\r  合并源: {name} ({lat}ms)")
-        sys.stdout.flush()
         data = parse_json(curl(url, 12))
         if not data or not isinstance(data, dict):
             continue
@@ -397,7 +495,7 @@ def main():
             if st == 3 and not s.get("jar") and abs_spider:
                 s["jar"] = abs_spider
 
-            # 相对路径修复 + GitHub 代理清洗
+            # 相对路径修复 + 私有域名代理清洗
             ext = s.get("ext", "")
             if isinstance(ext, str) and ext:
                 is_rel_file = ext.startswith(("./", "../", "/")) or (
@@ -448,12 +546,11 @@ def main():
         for f in (data.get("flags") or []):
             if isinstance(f, str) and f not in flag_keys:
                 flag_keys.add(f)
-                all_flags.append(f)
-    print()
-    print(f"  [站点级预清洗] 成功过滤掉 {eliminated_sites_count} 个垃圾占位符与残缺站点！")
 
-    # ── 4. 【核心创新：Type 3 爬虫引擎真实测速与智能评分模型】 ──
-    print(f"  启动 Jar 引擎真实带宽测速 (分析爬虫站质量)...")
+    print(f"  清洗完毕！剔除废站/垃圾占位符: {eliminated_sites_count} 个，保留高质量候选站: {len(all_sites)} 个")
+
+    # ── 3. Type 3 爬虫站：Jar 引擎真实连通性与吞吐并发测速 ──
+    print("\n[阶段 3/5] 正在对 Type 3 核心 Jar 包执行真实物理测速与死链淘汰...")
     unique_jars = set()
     for s in all_sites:
         if s.get("type") == 3 and s.get("jar"):
@@ -461,94 +558,75 @@ def main():
             if clean_j.startswith("http"):
                 unique_jars.add(clean_j)
 
-    jar_speed_map = {}
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        future_to_jar = {executor.submit(test_jar_speed, j): j for j in unique_jars}
-        for fut in as_completed(future_to_jar):
-            j_url = future_to_jar[fut]
-            try:
-                ok, ttfb, speed = fut.result()
-                jar_speed_map[j_url] = (ok, ttfb, speed)
-            except Exception:
-                jar_speed_map[j_url] = (False, 9999, 0)
-    print(f"  已完成 {len(jar_speed_map)} 个核心 Jar 引擎的真实吞吐测速！")
+    jar_speed_cache = {}
+    print(f"  涉及去重后独立 Jar 包共 {len(unique_jars)} 个，开始多线程真实网络测速...")
 
-    # 为所有爬虫站进行综合性能评分
+    with ThreadPoolExecutor(max_workers=16) as ex:
+        futures = {ex.submit(test_jar_speed, j): j for j in unique_jars}
+        for f in as_completed(futures):
+            j = futures[f]
+            ok, ttfb, spd = f.result()
+            jar_speed_cache[j] = (ok, ttfb, spd)
+
+    dead_jar_count = sum(1 for v in jar_speed_cache.values() if not v[0])
+    print(f"  测速完毕！存活 Jar: {len(unique_jars) - dead_jar_count} 个，淘汰死 Jar: {dead_jar_count} 个")
+
+    # 对 Type 3 站点进行多维综合评分
     scored_spiders = []
-    dead_spider_count = 0
     for s in all_sites:
         if s.get("type") != 3:
             continue
-        
         jar_url = s.get("jar", "").split(";md5;")[0]
-        jar_info = jar_speed_map.get(jar_url, (False, 9999, 0))
-        jar_ok, jar_ttfb, jar_speed = jar_info
-        
-        # 强淘汰：如果该站依赖的 Jar 本身已经 404 或死链，直接淘汰！
-        if not jar_ok:
-            dead_spider_count += 1
+        jar_info = jar_speed_cache.get(jar_url, (False, 9999, 0))
+        is_alive, jar_lat, jar_spd = jar_info
+
+        # 淘汰死 Jar 关联站点
+        if not is_alive:
             continue
 
-        # 评分模型：Jar 真实下载速度分 + 延迟扣分
-        score = min(jar_speed // 50, 100) - (jar_ttfb // 100)
+        raw_name_lower = s["_raw_name"].lower()
+        src_name_lower = s["_src_name"].lower()
 
-        # 口碑大源加分 (+50分)
-        src_name = s.get("_src_name", "").lower()
-        src_url = s.get("_src_url", "").lower()
-        if any(ts in src_name or ts in src_url for ts in TOP_TIER_SOURCES):
-            score += 50
+        # 评分基础分：Jar 实测下载带宽 (KB/s)
+        score = float(jar_spd)
 
-        # 高清秒播关键词加分 (+30分)
-        raw_name = s.get("_raw_name", "").lower()
-        if any(qk in raw_name for qk in QUALITY_KEYWORDS):
-            score += 30
+        # 延迟惩罚
+        score -= (jar_lat * 0.15)
+
+        # 口碑神源加权 (+500 分，确保排在最前面)
+        if any(kw in src_name_lower for kw in TOP_TIER_SOURCES):
+            score += 500
+        if any(kw in raw_name_lower for kw in TOP_TIER_SOURCES):
+            score += 300
+
+        # 4K / 原画 / 秒播等高品质加分 (+200 分)
+        if any(kw in raw_name_lower for kw in QUALITY_KEYWORDS):
+            score += 200
 
         s["_score"] = score
+        tag = "极速" if jar_spd > 2000 else "高清" if jar_spd > 800 else "流畅"
+        s["name"] = f"[{jar_spd}KB/s|{tag}] {s['_raw_name']}"
         scored_spiders.append(s)
 
-    # 爬虫站按综合得分从高到低排序
-    scored_spiders.sort(key=lambda x: -x.get("_score", 0))
-    print(f"  优质爬虫站甄别完成: 成功识别 {len(scored_spiders)} 个可用爬虫站 (剔除死 Jar 站点 {dead_spider_count} 个)")
+    scored_spiders.sort(key=lambda x: x["_score"], reverse=True)
+    print(f"  可用优质爬虫站筛选完毕，共计 {len(scored_spiders)} 个活跃站")
 
-    # ── 5. CMS 采集站并发播放测速 ──
-    print(f"  启动采集站切片播放测速 (共 {len(collect_sources)} 个采集站)...")
+    # ── 4. Type 0/1 采集站切片级播放测速 ──
+    print(f"\n[阶段 4/5] 正在对 {len(collect_sources)} 个采集站进行真实切片下载测速...")
     collect_results = []
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {executor.submit(_worker_test_speed, item): item for item in collect_sources.items()}
-        completed = 0
-        total = len(futures)
-        for fut in as_completed(futures):
-            completed += 1
-            res = fut.result()
-            if res:
-                collect_results.append(res)
-            sys.stdout.write(f"\r  采集测速进度: {completed}/{total} (有效可用: {len(collect_results)})")
-            sys.stdout.flush()
-    print()
+    with ThreadPoolExecutor(max_workers=20) as ex:
+        futures = {ex.submit(test_play_speed, api, st): (api, st) for api, (name, st) in collect_sources.items()}
+        for f in as_completed(futures):
+            api, st = futures[f]
+            ttfb, spd, status = f.result()
+            if spd > 30:
+                collect_results.append((ttfb, spd, api, st))
 
-    # 采集站速度降序，延迟升序
-    collect_results.sort(key=lambda x: (-x[1], x[0]))
+    collect_results.sort(key=lambda x: x[1], reverse=True)
+    print(f"  采集站测速完毕！保留秒播采集站: {len(collect_results)} 个")
 
-    # 置顶规则：索尼、360
-    PINNED_APIS = ["suoniapi.com", "360zy.com"]
-    pinned = [[] for _ in PINNED_APIS]
-    rest = []
-    for item in collect_results:
-        api = item[2]
-        placed = False
-        for i, kw in enumerate(PINNED_APIS):
-            if kw in api:
-                pinned[i].append(item)
-                placed = True
-                break
-        if not placed:
-            rest.append(item)
-    collect_results = [x for group in pinned for x in group] + rest
-
-    speed_map = {api: (ttfb, speed) for ttfb, speed, api, _ in collect_results}
-
-    # ── 6. 生成 tvbox.json（精品主力版：120 站高分智能筛选） ──
-    # 1. 提取实测最快的前 25 个优质采集站 (Type 0/1)
+    # ── 5. 精选站点与直播整合 ──
+    print(f"\n[阶段 5/5] 整合甄选 120 站、镜像本地 Jar 并通过 {MY_HOST} 生成各版本配置...")
     top_cms_sites = []
     for idx, (ttfb, speed, api, stype) in enumerate(collect_results[:25], 1):
         clean_name = urlparse(api).netloc or f"采集站{idx}"
@@ -567,9 +645,9 @@ def main():
             "filterable": 0
         })
 
-    needed_spiders = BOUTIQUE_LIMIT - len(top_cms_sites)  # 需要补充的高分爬虫站 (95个)
+    needed_spiders = BOUTIQUE_LIMIT - len(top_cms_sites)
 
-    # 2. 多源平权策略选取高分爬虫站（单源最多取 MAX_SPIDERS_PER_SOURCE 个，嗷呜/饭太硬等神源优先上榜）
+    # 多源平权策略选取高分爬虫站（单源最多取 MAX_SPIDERS_PER_SOURCE 个）
     source_distribution = {}
     balanced_spiders = []
     for s in scored_spiders:
@@ -587,7 +665,6 @@ def main():
             if len(balanced_spiders) >= needed_spiders:
                 break
 
-    # 若尚未凑满，继续由剩余高分爬虫补齐
     if len(balanced_spiders) < needed_spiders:
         for s in scored_spiders:
             if s not in balanced_spiders:
@@ -626,6 +703,14 @@ def main():
     best_spider = max(spider_jars, key=spider_jars.get) if spider_jars else ""
     best_spider = gh_proxy_url(best_spider)
 
+    # ── 【Jar 自动镜像本地化】: 下载核心 Jar 到本地 ./jars/ 并改写为自身域名直链 ──
+    best_spider = sync_and_localize_jars(all_sites, best_spider)
+    all_sites_jar_map = {s["key"]: s.get("jar") for s in all_sites if s.get("jar")}
+    for s in boutique_sites:
+        if s.get("key") in all_sites_jar_map:
+            s["jar"] = all_sites_jar_map[s["key"]]
+
+    # ── 6. 生成 tvbox.json（精品主力版：120 站高分智能筛选） ──
     boutique_json = {
         "spider": best_spider,
         "wallpaper": "https://bing.img.run/rand_uhd.php",
@@ -671,16 +756,9 @@ def main():
     print(f"  [全量版] 输出完成 (tvbox_full.json & tvbox_all.json): 包含全部 {len(all_sites)} 个站点 + 全量直播")
 
     # ── 8. 生成 tvbox_multi.json（多仓版） ──
-    pinned_repos = set()
-    for api_key in collect_sources:
-        for kw in PINNED_APIS:
-            if kw in api_key:
-                pinned_repos.add(collect_sources[api_key][0])
-    pinned_avail = [(n, u, l) for n, u, l in available if n in pinned_repos]
-    other_avail = [(n, u, l) for n, u, l in available if n not in pinned_repos]
     multi = {
         "storeHouse": [{"sourceName": f"[{lat}ms] {name}", "sourceUrl": gh_proxy_url(url)}
-                       for name, url, lat in pinned_avail + other_avail]
+                       for name, url, lat in available]
     }
     with open(os.path.join(WORK_DIR, "tvbox_multi.json"), "w", encoding="utf-8") as f:
         json.dump(multi, f, ensure_ascii=False, indent=2)
