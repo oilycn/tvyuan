@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 WORK_DIR = os.path.dirname(os.path.abspath(__file__))
 CF_PROXY = os.environ.get("CF_PROXY", "").rstrip("/")  # Cloudflare Worker 代理地址
-MAX_FULL_SITES = 120  # 全量版站点保留上限（推荐 100-150，防止电视盒子 OOM 崩溃）
+MAX_FULL_SITES = 0  # 全量版站点保留上限（推荐 100-150，防止电视盒子 OOM 崩溃）
 
 
 def gh_proxy_url(url):
