@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TVBox 聚合源自动更新（个人全量旗舰定制版）
-- 1. 爬虫站(type 3)自动继承专属 Jar，彻底解决 ClassNotFound
-- 2. 补全站点 ext 相对路径为绝对 URL
-- 3. 全量保留并合并去广告规则 (rules) 与解码标识 (flags)
-- 4. 增强 JSON 容错（过滤 // 与 /* */ 注释）
-- 5. 域名级深度排重（彻底解决红牛、量子等镜像站重复刷屏）
-- 6. 剔除死链采集站（仅收纳真实播放测速通过的有效源）
-- 7. 分级聚合搜索（前 25 个最快站开启快速搜索，避免电视搜片卡死十几秒）
-- 8. 解析线路优化（优先排布 JSON 快速解析，最多精选 15 条）
-- 9. 内置阿里 DoH 防宽带劫持 + Bing 每日超清壁纸
-- 10. 8 线程并发测速，2 分钟内极速完成更新
+TVBox 聚合源自动更新（个人全量旗舰定制版 + GitHub 国内智能加速）
+- 1. 【新增】全局 GitHub 加速：自动将 ext/jar/spider/lives/parses 中的 GitHub 链接转为国内高速代理
+- 2. 爬虫站(type 3)自动继承专属 Jar，彻底解决 ClassNotFound
+- 3. 自动将站点 ext 相对路径补全为绝对 URL
+- 4. 全量保留并合并去广告规则 (rules) 与解码标识 (flags)
+- 5. 增强 JSON 容错（过滤 // 与 /* */ 注释）
+- 6. 域名级深度排重（彻底解决红牛、量子等镜像站重复刷屏）
+- 7. 剔除死链采集站（仅收纳真实播放测速通过的有效源）
+- 8. 分级聚合搜索（前 25 个最快站开启快速搜索，避免电视搜片卡死十几秒）
+- 9. 解析线路优化（优先排布 JSON 快速解析，最多精选 15 条）
+- 10. 内置阿里 DoH 防宽带劫持 + Bing 每日超清壁纸
+- 11. 8 线程并发测速，2 分钟内极速完成更新
 """
 import json
 import sys
@@ -25,7 +26,28 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 WORK_DIR = os.path.dirname(os.path.abspath(__file__))
 CF_PROXY = os.environ.get("CF_PROXY", "").rstrip("/")  # Cloudflare Worker 代理地址
-MAX_FULL_SITES = 120  # 全量版保留站点上限（防止电视盒子内存溢出崩溃，推荐 100-150）
+MAX_FULL_SITES = 120  # 全量版站点保留上限（推荐 100-150，防止电视盒子 OOM 内存溢出）
+
+
+def gh_proxy_url(url):
+    """自动将裸奔的 GitHub 链接转换为国内可用加速镜像，支持保留 ;md5; 校验"""
+    if not isinstance(url, str) or not url.startswith("http"):
+        return url
+    
+    md5_suffix = ""
+    if ";md5;" in url:
+        parts = url.split(";md5;", 1)
+        base_url, md5_val = parts[0], parts[1]
+        md5_suffix = f";md5;{md5_val}"
+    else:
+        base_url = url
+
+    # 如果是 GitHub 链接且尚未包裹任何代理
+    if ("github.com" in base_url or "raw.githubusercontent.com" in base_url) and not any(
+        p in base_url for p in ["gh-proxy", "ghproxy", "fastgit", "jsdelivr"]
+    ):
+        return f"https://gh-proxy.com/{base_url}{md5_suffix}"
+    return url
 
 
 def curl(url, timeout=10, via_proxy=False):
@@ -90,10 +112,11 @@ def resolve_spider(spider, source_url):
         spider_path = spider
 
     if spider_path.startswith("http://") or spider_path.startswith("https://"):
-        return spider
+        resolved = spider_path
+    else:
+        resolved = resolve_url(source_url, spider_path)
 
-    resolved = resolve_url(source_url, spider_path)
-    return f"{resolved}{md5_suffix}"
+    return gh_proxy_url(f"{resolved}{md5_suffix}")
 
 
 def extract_m3u8(t):
@@ -302,11 +325,18 @@ def main():
             if s.get("type") == 3 and not s.get("jar") and abs_spider:
                 s["jar"] = abs_spider
 
-            # 【核心修复 2】：自动修复 ext 相对路径
+            # 【核心修复 2】：自动修复 ext 相对路径 + GitHub 国内加速
             ext = s.get("ext", "")
             if isinstance(ext, str) and ext:
                 if ext.startswith("./") or (not ext.startswith(("http://", "https://", "clan://", "{", "[")) and not "\n" in ext and ("." in ext or "/" in ext)):
-                    s["ext"] = resolve_url(url, ext)
+                    ext = resolve_url(url, ext)
+                s["ext"] = gh_proxy_url(ext)
+
+            # 【核心修复 3】：自动加速站点本身的 jar 和 api 属性（如果指向 GitHub）
+            if s.get("jar"):
+                s["jar"] = gh_proxy_url(s["jar"])
+            if isinstance(api, str) and api.startswith("http"):
+                s["api"] = gh_proxy_url(api)
 
             all_sites.append(s)
 
@@ -315,19 +345,21 @@ def main():
             if st in (0, 1) and api_host and api not in collect_sources:
                 collect_sources[api] = (name, st)
 
-        # 合并直播源
+        # 合并直播源（附带 GitHub 加速）
         for l in (data.get("lives") or []):
             u = l.get("url", "") if isinstance(l, dict) else ""
             if u and u not in live_keys:
                 live_keys.add(u)
+                if isinstance(l, dict):
+                    l["url"] = gh_proxy_url(u)
                 all_lives.append(l)
 
-        # 收集解析线路
+        # 收集解析线路（附带 GitHub 加速）
         for p in (data.get("parses") or []):
             if isinstance(p, dict) and p.get("url"):
                 all_parses.append(p)
 
-        # 【核心修复 3】：合并去广告规则 rules 与解码器 flags
+        # 合并去广告规则 rules 与解码器 flags
         for r in (data.get("rules") or []):
             rk = r.get("name") if isinstance(r, dict) else str(r)
             if rk and rk not in rule_keys:
@@ -387,7 +419,6 @@ def main():
                 s["_speed"] = speed_map[api][1]
                 s["_speed_ttfb"] = speed_map[api][0]
                 valid_sites.append(s)
-            # 测速失败的死采集站直接忽略
         else:
             # 爬虫站保留
             valid_sites.append(s)
@@ -434,13 +465,15 @@ def main():
         u = p.get("url", "")
         if u and u not in seen_parse_urls:
             seen_parse_urls.add(u)
+            p["url"] = gh_proxy_url(u)
             clean_parses.append(p)
-    # 优先排序：type=1 (JSON 快速解析) 靠前，网页嗅探靠后，精选前 15 条
+    # 优先排序：type=1 (JSON 快速解析) 靠前，精选前 15 条
     clean_parses.sort(key=lambda x: 0 if x.get("type") == 1 else 1)
     clean_parses = clean_parses[:15]
 
     # ── 6. 生成 tvbox_full.json（全量旗舰版）──
     best_spider = max(spider_jars, key=spider_jars.get) if spider_jars else ""
+    best_spider = gh_proxy_url(best_spider)
     final_full_sites = ordered_sites[:MAX_FULL_SITES] if (MAX_FULL_SITES and MAX_FULL_SITES > 0) else ordered_sites
 
     full_json = {
@@ -468,7 +501,7 @@ def main():
     pinned_avail = [(n, u, l) for n, u, l in available if n in pinned_repos]
     other_avail = [(n, u, l) for n, u, l in available if n not in pinned_repos]
     multi = {
-        "storeHouse": [{"sourceName": f"[{lat}ms] {name}", "sourceUrl": url}
+        "storeHouse": [{"sourceName": f"[{lat}ms] {name}", "sourceUrl": gh_proxy_url(url)}
                        for name, url, lat in pinned_avail + other_avail]
     }
     with open(os.path.join(WORK_DIR, "tvbox_multi.json"), "w", encoding="utf-8") as f:
