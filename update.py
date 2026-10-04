@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TVBox 聚合源自动更新（终极版：多仓穿透解包 + 彻底剔除网盘扫码 + 私有全加速）
-- 1. 【彻底解决多仓套娃】：递归穿透各级多仓，直挖最底层真实单仓；保证 tvbox_multi.json 每一项都是合规可用的单仓！
-- 2. 【彻底剔除网盘扫码】：全面清洗阿里/夸克/115/玩偶/木偶等必须扫码登录 Cookie 的网盘源，打造 100% 免扫码纯直链秒播体验
+TVBox 聚合源自动更新（标准规范版：双协议多仓兼容 + 彻底剔除网盘扫码 + 私有全加速）
+- 1. 【标准多仓协议】：tvbox_multi.json 同时输出 urls 和 storeHouse，完美兼容影视仓/TVBox所有版本多仓切换
+- 2. 【彻底剔除网盘扫码】：全面清洗阿里/夸克/115/玩偶/木偶等必须扫码登录 Cookie 的网盘源，实现 100% 免扫码纯直链秒播
 - 3. 【极简符号视觉优化】：移除冗长粗暴的 [557KB/s|稳] 前缀，改用 ⚡ ✨ 🚀 极简符号标识
 - 4. 【Jar 自动镜像本地化】：将所有站点的核心 Jar 同步下载到本仓库 ./jars/，通过 tv.gnoix.com/jars/ 提供秒开加速
 - 5. 【专属私有代理加速】：所有 GitHub 外链统一经由自身域名 https://tv.gnoix.com/https://... 加速分发，彻底摆脱第三方
 - 6. 精品版 (tvbox.json / 根路径 /)：精选 120 站 (95 个高分纯直链爬虫 + 25 个实测秒播采集) + 10 最快直播
 - 7. 全量版 (tvbox_full.json / 路径 /all)：海量全收录，无任何数量限制
-- 8. 纯净多仓版 (tvbox_multi.json)：剔除套娃，全由优质独立单仓组成
+- 8. 标准多仓版 (tvbox_multi.json)：标准多仓列表，即点即用
 """
 import json
 import sys
@@ -59,12 +59,10 @@ def is_pan_site(site):
     key = str(site.get("key", "")).lower()
     ext = str(site.get("ext", "")).lower()
 
-    # 1. 检测名字、key、api 是否命中网盘关键词
     for kw in PAN_EXCLUDE_KEYWORDS:
         if kw in raw_name or kw in api or kw in key:
             return True
 
-    # 2. 检测 ext 中是否包含 Token / Cookie / 网盘特征
     pan_ext_flags = ["token", "cookie", "alipan", "quark", "oauth", "alipanshare", "open_token"]
     if any(flag in ext for flag in pan_ext_flags):
         return True
@@ -73,7 +71,6 @@ def is_pan_site(site):
 
 
 def get_safe_download_url(u):
-    """处理包含中文域名或特殊字符的 URL，将其转为合法的 IDN/Punycode 编码"""
     clean = u.split(";md5;")[0]
     p = urllib.parse.urlsplit(clean)
     try:
@@ -84,7 +81,6 @@ def get_safe_download_url(u):
 
 
 def get_jar_storage_name(jar_url):
-    """根据 Jar 的原始路径生成唯一且稳定的本地文件名：[MD5前8位]_[原文件名]"""
     clean = jar_url.split(";md5;")[0]
     p = urllib.parse.urlsplit(clean)
     base_name = os.path.basename(p.path) or "spider.jar"
@@ -96,13 +92,6 @@ def get_jar_storage_name(jar_url):
 
 
 def sync_and_localize_jars(site_list, default_spider_url):
-    """
-    【Jar 自动镜像同步模块】：
-    1. 收集入选站点涉及的所有不同 Jar 包（包括默认全局 spider）
-    2. 多线程下载到仓库本地 ./jars/ 目录，持久化保存
-    3. 本地计算权威真实 MD5
-    4. 自动改写站点中的 jar 属性为自己的域名直链: https://tv.gnoix.com/jars/<fname>;md5;<real_md5>
-    """
     os.makedirs(JARS_DIR, exist_ok=True)
 
     unique_jars = set()
@@ -219,7 +208,6 @@ def gh_proxy_url(url):
 
 
 def curl(url, timeout=10, via_proxy=False):
-    """带超时控制的 HTTP 请求"""
     actual_url = f"{MY_HOST}/{url}" if (via_proxy and MY_HOST) else url
     try:
         r = subprocess.run(
@@ -233,7 +221,6 @@ def curl(url, timeout=10, via_proxy=False):
 
 
 def parse_json(raw):
-    """增强型 JSON 解析器：自动过滤 BOM、// 和 /* */ 注释，容忍尾逗号"""
     if not raw or not raw.strip():
         return None
     raw = raw.lstrip('\ufeff')
@@ -303,7 +290,6 @@ def build_url(base, params):
 
 
 def test_jar_speed(clean_jar_url):
-    """【真实物理测速】：测试核心 Jar 引擎的下载连通性与实测吞吐"""
     try:
         r = subprocess.run(
             ["curl", "-s", "-r", "0-131071", "-o", "/dev/null", "-w", "%{http_code},%{size_download},%{time_total}",
@@ -325,7 +311,6 @@ def test_jar_speed(clean_jar_url):
 
 
 def test_play_speed(api, stype, use_proxy=False):
-    """采集站切片级真实播放下载测速"""
     base = re.sub(r'[?&]ac=list.*', '', api.rstrip("/"))
     body = curl(build_url(base, "ac=list"), 12, via_proxy=use_proxy)
     if not body or len(body) < 50:
@@ -409,78 +394,42 @@ def test_play_speed(api, stype, use_proxy=False):
 
 def main():
     ts = time.strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{ts}] TVBox 聚合更新（终极版：多仓穿透解包 + 彻底剔除网盘扫码）开始...")
+    print(f"[{ts}] TVBox 聚合更新（标准规范版：双协议多仓 + 彻底剔除网盘）开始...")
 
     # ── 1. 抓取多仓源列表 ──
-    print("\n[阶段 1/5] 正在抓取多仓订阅列表...")
+    print("\n[阶段 1/5] 正在抓取多仓订阅源列表...")
     user_php = curl("http://tvbox.clbug.com/user.php", 15)
     if not user_php or len(user_php) < 100:
         print("  多仓列表获取失败，重试备用拉取...")
         user_php = curl("http://tvbox.clbug.com/user.php", 20, via_proxy=True)
 
     urls = re.findall(r'https?://[^\s"\'<>]+', user_php)
-    initial_urls = [u for u in urls if u.startswith("http") and not u.endswith((".m3u", ".txt", ".png", ".jpg"))]
-    print(f"  原始解析到 {len(initial_urls)} 条潜在仓库链接，开始递归穿透多仓...")
+    print(f"  原始解析到 {len(urls)} 条链接，开始连通性测试...")
 
-    # ── 2. 【多仓递归穿透与单仓纯净提纯引擎】 ──
-    # 纯单仓池: url -> (name, lat, data)
-    single_warehouse_pool = {}
-    # 纯多仓列表: 每一项都是可以直接在电视上切换的合格单仓
-    multi_storehouses = []
-    seen_urls = set()
-    seen_multi_names = set()
-
-    def inspect_and_unpack(u, parent_name="", depth=0):
-        # 防死循环，最大递归深度为 3 层
-        if u in seen_urls or depth > 3:
-            return
-        seen_urls.add(u)
-
+    def check_warehouse(u):
         t0 = time.time()
-        raw = curl(u, 10)
+        c = curl(u, 8)
         lat = int((time.time() - t0) * 1000)
-        data = parse_json(raw)
-        if not data or not isinstance(data, dict):
-            return
+        # 只要包含 sites、urls、storeHouse 中的任意一个，即为有效合规 TVBox 仓库文件
+        if c and len(c) > 50 and any(k in c for k in ["sites", "urls", "storeHouse"]):
+            m = re.search(r'name["\']?\s*:\s*["\']([^"\']+)["\']', c)
+            name = m.group(1).strip() if m else urlparse(u).netloc
+            return (name, u, lat, c)
+        return None
 
-        m = re.search(r'name["\']?\s*:\s*["\']([^"\']+)["\']', raw)
-        src_name = m.group(1).strip() if m else parent_name or urlparse(u).netloc
-
-        # 判定 A：这是【多仓】（包含 urls 或 storeHouse）
-        sub_list = data.get("urls") or data.get("storeHouse") or []
-        if isinstance(sub_list, list) and len(sub_list) > 0:
-            # 穿透解包：继续深挖下一级，绝不把这个多仓直接当子仓库推给电视！
-            for item in sub_list:
-                if isinstance(item, dict):
-                    sub_url = item.get("url") or item.get("sourceUrl") or ""
-                    sub_name = item.get("name") or item.get("sourceName") or src_name
-                    if sub_url and sub_url.startswith("http"):
-                        sub_abs = resolve_url(u, sub_url)
-                        inspect_and_unpack(sub_abs, parent_name=sub_name, depth=depth + 1)
-
-        # 判定 B：这才是真正的【单仓】（必须包含可播放的 sites 列表）
-        sites_list = data.get("sites")
-        if isinstance(sites_list, list) and len(sites_list) > 0:
-            single_warehouse_pool[u] = (src_name, lat, data)
-            # 只有真实的单仓，才记录进多仓切换列表！
-            clean_display_name = re.sub(r'^[\[\⚡\✨\🚀\📶\d+ms\|].*?\]\s*', '', src_name).strip() or "优质单仓"
-            if clean_display_name not in seen_multi_names:
-                seen_multi_names.add(clean_display_name)
-                multi_storehouses.append({
-                    "sourceName": f"[{lat}ms] {clean_display_name}",
-                    "sourceUrl": gh_proxy_url(u)
-                })
-
-    print("  并发穿透多仓解包中...")
+    available = []
     with ThreadPoolExecutor(max_workers=20) as ex:
-        futures = [ex.submit(inspect_and_unpack, u) for u in initial_urls]
+        futures = [ex.submit(check_warehouse, u) for u in urls if u.startswith("http")]
         for f in as_completed(futures):
-            f.result()
+            res = f.result()
+            if res:
+                available.append(res)
 
-    print(f"  穿透解包完毕！成功提取到底层纯单仓: {len(single_warehouse_pool)} 个，构建出无套娃纯多仓: {len(multi_storehouses)} 个")
+    available.sort(key=lambda x: x[2])
+    print(f"  筛选出 {len(available)} 个有效可用仓源！")
 
-    # ── 3. 解析单仓站点并执行【强淘汰 + 网盘扫码彻底过滤】 ──
-    print("\n[阶段 2/5] 深度遍历站点，彻底过滤网盘扫码站与垃圾占位符...")
+    # ── 2. 遍历有效源并执行【强淘汰 + 网盘扫码彻底过滤】 ──
+    print("\n[阶段 2/5] 深度遍历站点并清洗，彻底剔除网盘扫码站...")
     all_sites = []
     site_keys = set()
     spider_jars = {}
@@ -496,7 +445,11 @@ def main():
     eliminated_garbage = 0
     eliminated_pan = 0
 
-    for url, (name, lat, data) in single_warehouse_pool.items():
+    for name, url, lat, raw_text in available:
+        data = parse_json(raw_text)
+        if not data or not isinstance(data, dict):
+            continue
+
         spider = data.get("spider", "")
         abs_spider = resolve_spider(spider, url) if spider else ""
         if abs_spider:
@@ -599,7 +552,7 @@ def main():
     print(f"  清洗完毕！剔除废站垃圾: {eliminated_garbage} 个，【成功剔除网盘扫码站】: {eliminated_pan} 个！")
     print(f"  保留高质量【纯免登录直链候选站】: {len(all_sites)} 个")
 
-    # ── 4. Type 3 爬虫站：Jar 引擎真实连通性与吞吐并发测速 ──
+    # ── 3. Type 3 爬虫站：Jar 引擎真实连通性与吞吐并发测速 ──
     print("\n[阶段 3/5] 正在对免登录 Type 3 核心 Jar 包执行物理测速与淘汰...")
     unique_jars = set()
     for s in all_sites:
@@ -659,7 +612,7 @@ def main():
     scored_spiders.sort(key=lambda x: x["_score"], reverse=True)
     print(f"  优质免登录直链爬虫站筛选完毕，共计 {len(scored_spiders)} 个活跃站")
 
-    # ── 5. Type 0/1 采集站切片级播放测速 ──
+    # ── 4. Type 0/1 采集站切片级播放测速 ──
     print(f"\n[阶段 4/5] 正在对 {len(collect_sources)} 个采集站进行真实切片下载测速...")
     collect_results = []
     with ThreadPoolExecutor(max_workers=20) as ex:
@@ -673,7 +626,7 @@ def main():
     collect_results.sort(key=lambda x: x[1], reverse=True)
     print(f"  采集站测速完毕！保留秒播采集站: {len(collect_results)} 个")
 
-    # ── 6. 精选 120 站纯免登录秒播整合 ──
+    # ── 5. 精选 120 站纯免登录秒播整合 ──
     print(f"\n[阶段 5/5] 整合甄选 120 站、镜像本地 Jar 并通过 {MY_HOST} 生成各版本配置...")
     top_cms_sites = []
     for idx, (ttfb, speed, api, stype) in enumerate(collect_results[:25], 1):
@@ -758,7 +711,7 @@ def main():
         if s.get("key") in all_sites_jar_map:
             s["jar"] = all_sites_jar_map[s["key"]]
 
-    # ── 7. 输出 tvbox.json（精品主力版：120 站 100% 免扫码纯直链） ──
+    # ── 6. 输出 tvbox.json（精品主力版：120 站 100% 免扫码纯直链） ──
     boutique_json = {
         "spider": best_spider,
         "wallpaper": "https://bing.img.run/rand_uhd.php",
@@ -775,7 +728,7 @@ def main():
         json.dump(boutique_json, f, ensure_ascii=False, indent=2)
     print(f"  [精品主力版] 输出完成 (tvbox.json): 甄选 {len(boutique_sites)} 站 (纯直链高分爬虫:{len(balanced_spiders)} 采集:{len(top_cms_sites)}) + 精选 {len(boutique_lives)} 个最快直播源")
 
-    # ── 8. 输出 tvbox_full.json / tvbox_all.json（全量版，路径 /all） ──
+    # ── 7. 输出 tvbox_full.json / tvbox_all.json（全量版，路径 /all） ──
     for s in all_sites:
         s.pop("_src_name", None)
         s.pop("_src_url", None)
@@ -803,24 +756,31 @@ def main():
         json.dump(full_json, f, ensure_ascii=False, indent=2)
     print(f"  [全量版] 输出完成 (tvbox_full.json & tvbox_all.json): 包含全部 {len(all_sites)} 个免扫码纯净站点 + 全量直播")
 
-    # ── 9. 输出 tvbox_multi.json（真正纯净、无套娃、每一项皆可点击的多仓版） ──
-    multi_storehouses.sort(key=lambda x: int(re.search(r'\[(\d+)ms\]', x["sourceName"]).group(1)) if re.search(r'\[(\d+)ms\]', x["sourceName"]) else 9999)
+    # ── 8. 输出 tvbox_multi.json（多仓版：双格式标准兼容 urls & storeHouse） ──
+    # 标准影视仓格式 1: "urls": [{"name": "...", "url": "..."}]
+    # 传统 TVBox 格式 2: "storeHouse": [{"sourceName": "...", "sourceUrl": "..."}]
+    standard_urls = [
+        {"name": f"[{lat}ms] {name}", "url": gh_proxy_url(url)}
+        for name, url, lat, _ in available
+    ]
+    standard_storehouse = [
+        {"sourceName": f"[{lat}ms] {name}", "sourceUrl": gh_proxy_url(url)}
+        for name, url, lat, _ in available
+    ]
+
     multi = {
-        "storeHouse": multi_storehouses
+        "urls": standard_urls,
+        "storeHouse": standard_storehouse
     }
     with open(os.path.join(WORK_DIR, "tvbox_multi.json"), "w", encoding="utf-8") as f:
         json.dump(multi, f, ensure_ascii=False, indent=2)
-    print(f"  [纯净多仓版] 输出完成 (tvbox_multi.json): 共甄选 {len(multi_storehouses)} 个独立可用纯单仓（彻底阻断套娃报错）")
+    print(f"  [多仓版] 输出完成 (tvbox_multi.json): 共 {len(available)} 个独立仓库（双格式 urls & storeHouse 完美兼容）")
 
-    # ── 10. 写入 sources.txt 记录 ──
+    # ── 9. 写入 sources.txt 记录 ──
     with open(os.path.join(WORK_DIR, "sources.txt"), "w", encoding="utf-8") as f:
         f.write(f"# 更新时间: {ts}\n\n")
-        f.write("## 真实可用底层单仓列表\n")
-        for u, (name, lat, _) in single_warehouse_pool.items():
-            f.write(f"[{lat}ms] {name}\n{u}\n\n")
-        f.write("\n## 电视端多仓切换列表 (tvbox_multi.json)\n")
-        for item in multi_storehouses:
-            f.write(f"{item['sourceName']}\n{item['sourceUrl']}\n\n")
+        for name, url, lat, _ in available:
+            f.write(f"[{lat}ms] {name}\n{url}\n\n")
 
     print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 所有任务顺利完成！")
     return 0
