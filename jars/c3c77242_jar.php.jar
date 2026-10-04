@@ -120,7 +120,7 @@ function copy1() {
 }
 
 function copy2() {
-    var customContent2 = "https://tv.nxog.top?mm=3ec&ou=%E8%A3%85%F0%9F%85%B1";
+    var customContent2 = "https://tv.nxog.top?mm=3ed&ou=%E8%A3%85%F0%9F%85%B1";
     var tempInput = document.createElement("input");
     tempInput.value = customContent2;
     document.body.appendChild(tempInput);
