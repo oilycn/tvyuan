@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html class="gl-system" lang="zh-CN">
+<head>
+<meta content="width=device-width, initial-scale=1" name="viewport">
+<title>拒绝访问</title>
+<script nonce="7SgNdXNLRLh+G+QXFDzi3g==">
+//<![CDATA[
+const root = document.documentElement;
+if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  root.classList.add('gl-dark');
+}
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  if (e.matches) {
+    root.classList.add('gl-dark');
+  } else {
+    root.classList.remove('gl-dark');
+  }
+});
+
+//]]>
+</script>
+<link rel="stylesheet" href="/assets/errors-45c1d2fc2ec7ef0afac5acde41382108e23931e8271d844594f126d177eaf5ab.css" />
+<link rel="stylesheet" href="/assets/application-bff1335b7b2d7562d6297c5e05029c6d7f5875b760d77171bce173dadf8e5ed4.css" />
+<link rel="stylesheet" href="/assets/fonts-deb7ad1d55ca77c0172d8538d53442af63604ff490c74acc2859db295c125bdb.css" />
+<link rel="stylesheet" href="/assets/tailwind-85af10e01cca20f1f86e9d5f33adcd112301bdc1fa348846fcb1f6f6a98c4898.css" />
+</head>
+<body>
+<div class="page-container">
+<div class="holder">
+<img alt="拒绝访问" src="/assets/illustrations/error-401-5bd93bd6f763f1c5caa08d1df09cf1686b3cc62ace0689f71f53b8e115873099.svg" />
+<div class="gl-text-center">
+<h3>
+页面访问受限
+</h3>
+<p>
+抱歉，您没有访问页面的权限
+</p>
+<p>
+您必须先登录极狐GitLab 才能访问此页面
+</p>
+<a class="gl-button btn  btn-confirm " href="/users/sign_in"><span class="gl-button-text">
+登录
+
+</span>
+
+</a><a style="margin-left: 6px" class="gl-button btn  btn-default " href="/"><span class="gl-button-text">
+返回首页
+
+</span>
+
+</a></div>
+</div>
+
+</div>
+<script nonce="7SgNdXNLRLh+G+QXFDzi3g==">
+//<![CDATA[
+(function(){
+  var goBackElement = document.querySelector('.js-go-back');
+
+  if (goBackElement && history.length > 1) {
+    goBackElement.removeAttribute('hidden');
+
+    goBackElement.querySelector('button').addEventListener('click', function() {
+      history.back();
+    });
+  }
+
+  // We do not have rails_ujs here, so we're manually making a link trigger a form submit.
+  document.querySelector('.js-sign-out-link')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelector('.js-sign-out-form')?.submit();
+  });
+}());
+
+//]]>
+</script></body>
+</html>
