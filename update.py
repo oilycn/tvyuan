@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TVBox 聚合源自动更新（多仓递归解包 + 网盘扫码站彻底淘汰 + 纯直链秒播版）
-- 1. 【多仓与单仓智能分流】：自动递归展开多仓中的子单仓，神级子源零遗漏；严格净化多仓输出
-- 2. 【网盘扫码站绝对过滤】：全面剔除阿里/夸克/115/玩偶等需要扫码登录 Cookie/Token 的网盘源，实现 100% 免扫码纯直链秒播
-- 3. 【强力预淘汰】：测速前直接清洗垃圾占位符（配置中心/本地/预告/说明）、残缺站、死链仓
-- 4. 【Type 3 真实物理测速评分】：并发测试核心 Jar 包真实下载带宽(KB/s)与响应延迟，死 Jar 站点直接淘汰
-- 5. 【极简符号视觉优化】：移除冗长粗暴的前缀，改用 ⚡ ✨ 🚀 极简符号标识
-- 6. 【Jar 自动镜像本地化】：将所有站点的核心 Jar 同步下载到本仓库 ./jars/，通过 tv.gnoix.com/jars/ 提供秒开加速
-- 7. 【专属私有代理加速】：所有 GitHub 外链统一经由自身域名 https://tv.gnoix.com/https://... 加速分发，彻底摆脱第三方
-- 8. 精品版 (tvbox.json / 根路径 /)：精选 120 站 (95 个高分纯直链爬虫 + 25 个实测秒播采集) + 10 最快直播
-- 9. 全量版 (tvbox_full.json / 路径 /all)：海量全收录，无任何数量限制
+TVBox 聚合源自动更新（终极版：多仓穿透解包 + 彻底剔除网盘扫码 + 私有全加速）
+- 1. 【彻底解决多仓套娃】：递归穿透各级多仓，直挖最底层真实单仓；保证 tvbox_multi.json 每一项都是合规可用的单仓！
+- 2. 【彻底剔除网盘扫码】：全面清洗阿里/夸克/115/玩偶/木偶等必须扫码登录 Cookie 的网盘源，打造 100% 免扫码纯直链秒播体验
+- 3. 【极简符号视觉优化】：移除冗长粗暴的 [557KB/s|稳] 前缀，改用 ⚡ ✨ 🚀 极简符号标识
+- 4. 【Jar 自动镜像本地化】：将所有站点的核心 Jar 同步下载到本仓库 ./jars/，通过 tv.gnoix.com/jars/ 提供秒开加速
+- 5. 【专属私有代理加速】：所有 GitHub 外链统一经由自身域名 https://tv.gnoix.com/https://... 加速分发，彻底摆脱第三方
+- 6. 精品版 (tvbox.json / 根路径 /)：精选 120 站 (95 个高分纯直链爬虫 + 25 个实测秒播采集) + 10 最快直播
+- 7. 全量版 (tvbox_full.json / 路径 /all)：海量全收录，无任何数量限制
+- 8. 纯净多仓版 (tvbox_multi.json)：剔除套娃，全由优质独立单仓组成
 """
 import json
 import sys
@@ -410,10 +409,10 @@ def test_play_speed(api, stype, use_proxy=False):
 
 def main():
     ts = time.strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{ts}] TVBox 聚合更新（多仓递归解包 + 网盘扫码站彻底淘汰版）开始...")
+    print(f"[{ts}] TVBox 聚合更新（终极版：多仓穿透解包 + 彻底剔除网盘扫码）开始...")
 
     # ── 1. 抓取多仓源列表 ──
-    print("\n[阶段 1/5] 正在抓取仓库订阅源列表...")
+    print("\n[阶段 1/5] 正在抓取多仓订阅列表...")
     user_php = curl("http://tvbox.clbug.com/user.php", 15)
     if not user_php or len(user_php) < 100:
         print("  多仓列表获取失败，重试备用拉取...")
@@ -421,17 +420,19 @@ def main():
 
     urls = re.findall(r'https?://[^\s"\'<>]+', user_php)
     initial_urls = [u for u in urls if u.startswith("http") and not u.endswith((".m3u", ".txt", ".png", ".jpg"))]
-    print(f"  原始解析到 {len(initial_urls)} 条潜在仓库链接，开始递归拆解多仓与单仓...")
+    print(f"  原始解析到 {len(initial_urls)} 条潜在仓库链接，开始递归穿透多仓...")
 
-    # ── 2. 【多仓与单仓递归解包引擎】 ──
-    # 纯正的单仓池 (包含 sites 的真正影视源)
+    # ── 2. 【多仓递归穿透与单仓纯净提纯引擎】 ──
+    # 纯单仓池: url -> (name, lat, data)
     single_warehouse_pool = {}
-    # 真正的多仓列表 (写入 tvbox_multi.json)
+    # 纯多仓列表: 每一项都是可以直接在电视上切换的合格单仓
     multi_storehouses = []
     seen_urls = set()
+    seen_multi_names = set()
 
-    def inspect_and_unpack(u, parent_name=""):
-        if u in seen_urls:
+    def inspect_and_unpack(u, parent_name="", depth=0):
+        # 防死循环，最大递归深度为 3 层
+        if u in seen_urls or depth > 3:
             return
         seen_urls.add(u)
 
@@ -442,37 +443,44 @@ def main():
         if not data or not isinstance(data, dict):
             return
 
-        # 获取当前源的名字
         m = re.search(r'name["\']?\s*:\s*["\']([^"\']+)["\']', raw)
         src_name = m.group(1).strip() if m else parent_name or urlparse(u).netloc
 
         # 判定 A：这是【多仓】（包含 urls 或 storeHouse）
         sub_list = data.get("urls") or data.get("storeHouse") or []
         if isinstance(sub_list, list) and len(sub_list) > 0:
-            multi_storehouses.append({"sourceName": f"[{lat}ms] {src_name}", "sourceUrl": gh_proxy_url(u)})
-            # 核心递归：把多仓里面的几十个子源，全部“抖出来”加入单仓待爬池！
+            # 穿透解包：继续深挖下一级，绝不把这个多仓直接当子仓库推给电视！
             for item in sub_list:
                 if isinstance(item, dict):
                     sub_url = item.get("url") or item.get("sourceUrl") or ""
                     sub_name = item.get("name") or item.get("sourceName") or src_name
                     if sub_url and sub_url.startswith("http"):
                         sub_abs = resolve_url(u, sub_url)
-                        inspect_and_unpack(sub_abs, parent_name=sub_name)
+                        inspect_and_unpack(sub_abs, parent_name=sub_name, depth=depth + 1)
 
-        # 判定 B：这是【单仓】（包含 sites）
-        if "sites" in data and isinstance(data.get("sites"), list):
+        # 判定 B：这才是真正的【单仓】（必须包含可播放的 sites 列表）
+        sites_list = data.get("sites")
+        if isinstance(sites_list, list) and len(sites_list) > 0:
             single_warehouse_pool[u] = (src_name, lat, data)
+            # 只有真实的单仓，才记录进多仓切换列表！
+            clean_display_name = re.sub(r'^[\[\⚡\✨\🚀\📶\d+ms\|].*?\]\s*', '', src_name).strip() or "优质单仓"
+            if clean_display_name not in seen_multi_names:
+                seen_multi_names.add(clean_display_name)
+                multi_storehouses.append({
+                    "sourceName": f"[{lat}ms] {clean_display_name}",
+                    "sourceUrl": gh_proxy_url(u)
+                })
 
-    print("  正在并发解包多仓并提取底层单仓...")
+    print("  并发穿透多仓解包中...")
     with ThreadPoolExecutor(max_workers=20) as ex:
         futures = [ex.submit(inspect_and_unpack, u) for u in initial_urls]
         for f in as_completed(futures):
             f.result()
 
-    print(f"  解包完成！成功提取纯单仓: {len(single_warehouse_pool)} 个，纯多仓: {len(multi_storehouses)} 个")
+    print(f"  穿透解包完毕！成功提取到底层纯单仓: {len(single_warehouse_pool)} 个，构建出无套娃纯多仓: {len(multi_storehouses)} 个")
 
-    # ── 3. 解析有效单仓并执行【强淘汰 + 网盘扫码彻底过滤】 ──
-    print("\n[阶段 2/5] 遍历单仓站点，彻底过滤网盘扫码站与垃圾占位符...")
+    # ── 3. 解析单仓站点并执行【强淘汰 + 网盘扫码彻底过滤】 ──
+    print("\n[阶段 2/5] 深度遍历站点，彻底过滤网盘扫码站与垃圾占位符...")
     all_sites = []
     site_keys = set()
     spider_jars = {}
@@ -795,21 +803,22 @@ def main():
         json.dump(full_json, f, ensure_ascii=False, indent=2)
     print(f"  [全量版] 输出完成 (tvbox_full.json & tvbox_all.json): 包含全部 {len(all_sites)} 个免扫码纯净站点 + 全量直播")
 
-    # ── 9. 输出 tvbox_multi.json（真正纯净的多仓版） ──
+    # ── 9. 输出 tvbox_multi.json（真正纯净、无套娃、每一项皆可点击的多仓版） ──
+    multi_storehouses.sort(key=lambda x: int(re.search(r'\[(\d+)ms\]', x["sourceName"]).group(1)) if re.search(r'\[(\d+)ms\]', x["sourceName"]) else 9999)
     multi = {
         "storeHouse": multi_storehouses
     }
     with open(os.path.join(WORK_DIR, "tvbox_multi.json"), "w", encoding="utf-8") as f:
         json.dump(multi, f, ensure_ascii=False, indent=2)
-    print(f"  [纯净多仓版] 输出完成 (tvbox_multi.json): {len(multi_storehouses)} 个独立多仓")
+    print(f"  [纯净多仓版] 输出完成 (tvbox_multi.json): 共甄选 {len(multi_storehouses)} 个独立可用纯单仓（彻底阻断套娃报错）")
 
     # ── 10. 写入 sources.txt 记录 ──
     with open(os.path.join(WORK_DIR, "sources.txt"), "w", encoding="utf-8") as f:
         f.write(f"# 更新时间: {ts}\n\n")
-        f.write("## 纯单仓列表\n")
+        f.write("## 真实可用底层单仓列表\n")
         for u, (name, lat, _) in single_warehouse_pool.items():
             f.write(f"[{lat}ms] {name}\n{u}\n\n")
-        f.write("\n## 纯多仓列表\n")
+        f.write("\n## 电视端多仓切换列表 (tvbox_multi.json)\n")
         for item in multi_storehouses:
             f.write(f"{item['sourceName']}\n{item['sourceUrl']}\n\n")
 
