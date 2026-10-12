@@ -1,389 +1,380 @@
-# 更新时间: 2026-10-11 19:55:03
+# 更新时间: 2026-10-12 00:59:47
 
-[63ms] 牛播一(新版影视仓/ok影视)
-https://dxawi.github.io/0/0.json
-
-[67ms] 本地live文件
-https://raw.githubusercontent.com/xyq254245/xyqonlinerule/main/XYQTVBox.json
-
-[73ms] 饭太硬💜线路
-http://raw.liucn.cc/box/dc.txt
-
-[78ms] 🌕┃豆瓣┃热播
-https://cdn.jsdelivr.net/gh/liu673cn/box@main/m.json
-
-[79ms] 🌕┃豆瓣┃热播
-https://cdn.jsdelivr.net/gh/liu673cn/box@main/m.json
-
-[100ms] 饭太硬💜线路
-http://raw.liucn.cc/box/dc.txt
-
-[105ms] 美少女
-https://raw.githubusercontent.com/wwb521/live/refs/heads/main/video.json
-
-[115ms] live
-https://raw.githubusercontent.com/supermeguo/BoxRes/main/Myuse/catcr.json
-
-[119ms] 牛播一(新版影视仓/ok影视)
-https://dxawi.github.io/0/0.json
-
-[120ms] migu
-https://qist.wyfc.qzz.io/jsm.json
-
-[121ms] IPTV
-https://raw.githubusercontent.com/PickPunk/TVbox-ZYplayer/refs/heads/main/ZY.json
-
-[126ms] IPTV
-https://raw.githubusercontent.com/PickPunk/TVbox-ZYplayer/refs/heads/main/ZY.json
-
-[129ms] live
-https://raw.githubusercontent.com/supermeguo/BoxRes/main/Myuse/catcr.json
-
-[137ms] 卧龙资源(切)
-https://pastebin.com/raw/gtbKvnE1
-
-[138ms] 美少女
-https://raw.githubusercontent.com/wwb521/live/refs/heads/main/video.json
-
-[148ms] 链接失效，公众号:半糖仙人
-https://gist.githubusercontent.com/ph7368/20ee6c7b64d77d82f8f4162cdd04ad61/raw/gistfile1.txt
-
-[148ms] 本地live文件
-https://raw.githubusercontent.com/xyq254245/xyqonlinerule/main/XYQTVBox.json
-
-[151ms] live
-https://raw.githubusercontent.com/guot55/YGBH/main/vip2.json
-
-[160ms] live
-https://raw.githubusercontent.com/guot55/YGBH/main/vip2.json
-
-[171ms] iptv-org.github.io
-https://iptv-org.github.io/iptv/categories/news.m3u
-
-[183ms] 24live
+[70ms] 24live
 https://tv.203511.xyz/0821.json
 
-[185ms] 🌕┃豆瓣┃热播
-https://raw.liucn.cc/box/m.json
-
-[190ms] 卧龙资源(切)
-https://pastebin.com/raw/gtbKvnE1
-
-[193ms] 豆瓣 • 首页
-https://qist.wyfc.qzz.io/xiaosa/api.json
-
-[194ms] iptv-org.github.io
-https://iptv-org.github.io/iptv/categories/news.m3u
-
-[199ms] 精品 | 采集
-https://clun.top/fun.json
-
-[206ms] 残月线路
-https://gh-proxy.com/https://raw.githubusercontent.com/1771245847/TvBox/master/tvbox.txt
-
-[224ms] 24live
-https://tv.203511.xyz/0821.json
-
-[224ms] 残月线路
-https://gh-proxy.com/https://raw.githubusercontent.com/1771245847/TvBox/master/tvbox.txt
-
-[226ms] 精品 | 采集
-https://clun.top/fun.json
-
-[233ms] 精品 | 采集
-https://clun.top/fun.json
-
-[241ms] live
-https://gh-proxy.org/raw.githubusercontent.com/bin1site1/bin1site1.github.io/refs/heads/main/OS.json
-
-[242ms] live
-https://gh-proxy.org/raw.githubusercontent.com/bin1site1/bin1site1.github.io/refs/heads/main/OS.json
-
-[244ms] 🔥聚玩盒子4K
-http://xhztv.top/4k.json
-
-[246ms] 🌕┃豆瓣┃热播
-https://raw.liucn.cc/box/m.json
-
-[247ms] 南风直播源
-https://gitlab.com/noimank/tvbox/-/raw/main/tvbox1.json
-
-[252ms] 🔥聚玩盒子4K
-http://xhztv.top/4k.json
-
-[253ms] 南风直播源
-https://gitlab.com/noimank/tvbox/-/raw/main/tvbox1.json
-
-[256ms] 链接失效，公众号:半糖仙人
-https://gist.githubusercontent.com/ph7368/20ee6c7b64d77d82f8f4162cdd04ad61/raw/gistfile1.txt
-
-[257ms] 🚀小盒子
-http://xhztv.top/dc
-
-[258ms] migu
+[92ms] migu
 https://qist.wyfc.qzz.io/jsm.json
 
-[262ms] 🚀小盒子
-http://xhztv.top/dc
-
-[264ms] 🚀1-心魔在线
-https://gh-proxy.com/https://raw.githubusercontent.com/noimank/tvbox/master/tvboxmuti.json
-
-[267ms] 🚀1-心魔在线
-https://gh-proxy.com/https://raw.githubusercontent.com/noimank/tvbox/master/tvboxmuti.json
-
-[281ms] 音乐-蜻蜓-点我切换线路-(公众号老猫迷)
-https://d.kstore.dev/download/14782/%E5%BD%B1%E8%A7%86%E4%BB%93.json
-
-[291ms] 豆瓣
-https://gh-proxy.com/https://raw.githubusercontent.com/1771245847/TvBox/master/tvbox.json
-
-[297ms] 音乐-蜻蜓-点我切换线路-(公众号老猫迷)
-https://d.kstore.dev/download/14782/%E5%BD%B1%E8%A7%86%E4%BB%93.json
-
-[298ms] 📢万事顺意、喜气洋洋、阖家幸福、岁岁平安！
-https://tv.nxog.top/m/111.php
-
-[301ms] 豆瓣 • 首页
+[93ms] 豆瓣 • 首页
 https://qist.wyfc.qzz.io/xiaosa/api.json
 
-[308ms] 📢仅限测试用，请勿演示贩卖购买，谨防上当受骗！
-https://tv.nxog.top/m/111.php
+[96ms] 豆瓣 • 首页
+https://qist.wyfc.qzz.io/xiaosa/api.json
 
-[312ms] 豆瓣
+[102ms] migu
+https://qist.wyfc.qzz.io/jsm.json
+
+[105ms] 🌕┃豆瓣┃热播
+https://cdn.jsdelivr.net/gh/liu673cn/box@main/m.json
+
+[109ms] 🌕┃豆瓣┃热播
+https://cdn.jsdelivr.net/gh/liu673cn/box@main/m.json
+
+[109ms] 饭太硬💜线路
+http://raw.liucn.cc/box/dc.txt
+
+[111ms] 卧龙资源(切)
+https://pastebin.com/raw/gtbKvnE1
+
+[113ms] 卧龙资源(切)
+https://pastebin.com/raw/gtbKvnE1
+
+[114ms] 🚀小盒子
+http://xhztv.top/dc
+
+[118ms] 饭太硬💜线路
+http://raw.liucn.cc/box/dc.txt
+
+[120ms] 🚀小盒子
+http://xhztv.top/dc
+
+[123ms] 精品 | 采集
+https://clun.top/fun.json
+
+[124ms] 本地live文件
+https://raw.githubusercontent.com/xyq254245/xyqonlinerule/main/XYQTVBox.json
+
+[130ms] 本地live文件
+https://raw.githubusercontent.com/xyq254245/xyqonlinerule/main/XYQTVBox.json
+
+[133ms] 🔥聚玩盒子4K
+http://xhztv.top/4k.json
+
+[133ms] live
+https://raw.githubusercontent.com/supermeguo/BoxRes/main/Myuse/catcr.json
+
+[135ms] live
+https://raw.githubusercontent.com/supermeguo/BoxRes/main/Myuse/catcr.json
+
+[136ms] 牛播一(新版影视仓/ok影视)
+https://dxawi.github.io/0/0.json
+
+[137ms] 🔥聚玩盒子4K
+http://xhztv.top/4k.json
+
+[140ms] IPTV
+https://raw.githubusercontent.com/PickPunk/TVbox-ZYplayer/refs/heads/main/ZY.json
+
+[145ms] 🌕┃豆瓣┃热播
+https://raw.liucn.cc/box/m.json
+
+[147ms] 24live
+https://tv.203511.xyz/0821.json
+
+[156ms] 美少女
+https://raw.githubusercontent.com/wwb521/live/refs/heads/main/video.json
+
+[160ms] 南风直播源
+https://gitlab.com/noimank/tvbox/-/raw/main/tvbox1.json
+
+[161ms] 豆豆┃片单
+https://qist.wyfc.qzz.io/fty.json
+
+[166ms] 南风直播源
+https://gitlab.com/noimank/tvbox/-/raw/main/tvbox1.json
+
+[170ms] iptv-org.github.io
+https://iptv-org.github.io/iptv/categories/news.m3u
+
+[179ms] 牛播一(新版影视仓/ok影视)
+https://dxawi.github.io/0/0.json
+
+[182ms] 豆豆┃片单
+https://qist.wyfc.qzz.io/fty.json
+
+[182ms] iptv-org.github.io
+https://iptv-org.github.io/iptv/categories/news.m3u
+
+[187ms] 精品 | 采集
+https://clun.top/fun.json
+
+[189ms] 🐮【免费分享】🐮
+https://9280.kstore.space/wex.json
+
+[195ms] 残月线路
+https://gh-proxy.com/https://raw.githubusercontent.com/1771245847/TvBox/master/tvbox.txt
+
+[202ms] 精品 | 采集
+https://clun.top/fun.json
+
+[205ms] 🌕┃豆瓣┃热播
+https://raw.liucn.cc/box/m.json
+
+[213ms] 残月线路
+https://gh-proxy.com/https://raw.githubusercontent.com/1771245847/TvBox/master/tvbox.txt
+
+[220ms] 音乐-蜻蜓-点我切换线路-(公众号老猫迷)
+https://d.kstore.dev/download/14782/%E5%BD%B1%E8%A7%86%E4%BB%93.json
+
+[223ms] live
+https://raw.githubusercontent.com/guot55/YGBH/main/vip2.json
+
+[226ms] 豆瓣
 https://gh-proxy.com/https://raw.githubusercontent.com/1771245847/TvBox/master/tvbox.json
+
+[229ms] 音乐-蜻蜓-点我切换线路-(公众号老猫迷)
+https://d.kstore.dev/download/14782/%E5%BD%B1%E8%A7%86%E4%BB%93.json
+
+[231ms] live
+https://raw.githubusercontent.com/guot55/YGBH/main/vip2.json
+
+[247ms] 🚀1-心魔在线
+https://gh-proxy.com/https://raw.githubusercontent.com/noimank/tvbox/master/tvboxmuti.json
+
+[255ms] 🚀1-心魔在线
+https://gh-proxy.com/https://raw.githubusercontent.com/noimank/tvbox/master/tvboxmuti.json
+
+[277ms] 豆瓣
+https://gh-proxy.com/https://raw.githubusercontent.com/1771245847/TvBox/master/tvbox.json
+
+[304ms] 链接失效，公众号:半糖仙人
+https://gist.githubusercontent.com/ph7368/20ee6c7b64d77d82f8f4162cdd04ad61/raw/gistfile1.txt
+
+[307ms] 链接失效，公众号:半糖仙人
+https://gist.githubusercontent.com/ph7368/20ee6c7b64d77d82f8f4162cdd04ad61/raw/gistfile1.txt
+
+[307ms] IPTV
+https://raw.githubusercontent.com/PickPunk/TVbox-ZYplayer/refs/heads/main/ZY.json
+
+[313ms] 雷蒙影视电视直播
+https://gh-proxy.org/https://raw.githubusercontent.com/n3rddd/N3RD/master/JN/lemj.json
+
+[320ms] 雷蒙影视电视直播
+https://gh-proxy.org/https://raw.githubusercontent.com/n3rddd/N3RD/master/JN/lemj.json
+
+[338ms] 📢免费仅限测试用，如有收费,直接找退款！
+http://a.nxog.top/m/111.php?ou=%E5%85%AC%E4%BC%97%E5%8F%B7%E6%AC%A7%E6%AD%8Capp&amp;mz=index&amp;jar=index&amp;123&amp;b=tv
 
 [342ms] 🐮【免费分享】🐮
 https://9280.kstore.space/wex.json
 
-[359ms] 1.\u7231\u5947\u827a\u817e\u8baf\u4f18\u9177\u9ad8\u901f\u63a5\u53e3\u3010\u652f\u6301TVBOX/\u5f71\u89c6\u4ed3\u3011\u652f\u6301V3\u7248\u672c..............................\u516c\u4f17\u53f7\u641c:PlayTV
-https://teach.link/7BgCf8
-
-[367ms] 直播
-https://gh-proxy.org/https://raw.github.com/tly824/TM-TY/main/8.10.json
-
-[372ms] 🚀1-心魔在线
-https://gitlab.com/noimank/tvbox/-/raw/main/tvboxmuti.json
-
-[379ms] SVIP📚在线
-http://xmbjm.fh4u.org/dc.txt
-
-[380ms] 直播
-https://gh-proxy.org/https://raw.github.com/tly824/TM-TY/main/8.10.json
-
-[382ms] 1.\u7231\u5947\u827a\u817e\u8baf\u4f18\u9177\u9ad8\u901f\u63a5\u53e3\u3010\u652f\u6301TVBOX/\u5f71\u89c6\u4ed3\u3011\u652f\u6301V3\u7248\u672c..............................\u516c\u4f17\u53f7\u641c:PlayTV
-https://teach.link/7BgCf8
-
-[399ms] 🚀1-心魔在线
-https://gitlab.com/noimank/tvbox/-/raw/main/tvboxmuti.json
-
-[417ms] 🐮【免费分享】🐮
+[346ms] 🐮【免费分享】🐮
 https://9280.kstore.space/wex.json
 
-[420ms] SVIP📚在线
-http://xmbjm.fh4u.org/dc.txt
-
-[427ms] 📺 平台直播
-http://124.223.214.31:16/8888
-
-[431ms] 微信小程序搜【淘软件】获取最新接口
-http://124.223.214.31:8/api.json
-
-[433ms] 🐮【免费分享】🐮
-https://9280.kstore.space/wex.json
-
-[439ms] 微信小程序搜【淘软件】获取最新接口
-http://124.223.214.31:8/api.json
-
-[445ms] 雷蒙影视电视直播
-https://gh-proxy.org/https://raw.githubusercontent.com/n3rddd/N3RD/master/JN/lemj.json
-
-[451ms] 🐮【免费分享】🐮
-https://9280.kstore.space/wex.json
-
-[464ms] 🐮【免费分享】🐮
-https://9280.kstore.vip/aiwex.json
-
-[464ms] 📢免费仅限测试用，如有收费,直接找退款！
+[352ms] 📢龙马精神、金戈铁马、骏马迎春、马行千里！
 http://a.nxog.top/m/111.php?ou=%E5%85%AC%E4%BC%97%E5%8F%B7%E6%AC%A7%E6%AD%8Capp&amp;mz=index&amp;jar=index&amp;123&amp;b=tv
 
-[470ms] 📺 平台直播
-http://124.223.214.31:16/8888
+[370ms] live
+https://gh-proxy.org/raw.githubusercontent.com/bin1site1/bin1site1.github.io/refs/heads/main/OS.json
 
-[474ms] 豆豆┃片单
-https://qist.wyfc.qzz.io/fty.json
+[379ms] 美少女
+https://raw.githubusercontent.com/wwb521/live/refs/heads/main/video.json
 
-[482ms] 🐮【免费分享】🐮
-https://9280.kstore.vip/aiwex.json
-
-[496ms] 📢网络收集勿演示贩卖！严谨用于任何商业用途！
-http://a.nxog.top/m/111.php?ou=%E5%85%AC%E4%BC%97%E5%8F%B7%E6%AC%A7%E6%AD%8Capp&amp;mz=index&amp;jar=index&amp;123&amp;b=tv
-
-[503ms] 🌙月光宝盒家庭版〔多条线路〕
-https://jihulab.com/ygbh1/box/-/raw/main/dcang/dc2.json
-
-[507ms] 🌙月光宝盒家庭版〔多条线路〕
-https://jihulab.com/ygbh1/box/-/raw/main/dcang/dc2.json
-
-[535ms] 🐮【免费分享】🐮
+[383ms] 🐮【免费分享】🐮
 https://9280.kstore.space/wex.json
 
-[573ms] 雷蒙影视电视直播
-https://gh-proxy.org/https://raw.githubusercontent.com/n3rddd/N3RD/master/JN/lemj.json
+[384ms] 📺 平台直播
+http://124.223.214.31:16/8888
 
-[589ms] 公众号【白虾工具】搜集整合
-https://mpimg.cn/text.php?hash=aeada10283cf466c508e6b05b5a11719
+[384ms] live
+https://gh-proxy.org/raw.githubusercontent.com/bin1site1/bin1site1.github.io/refs/heads/main/OS.json
 
-[590ms] 豆豆┃片单
-https://qist.wyfc.qzz.io/fty.json
+[390ms] 微信小程序搜【淘软件】获取最新接口
+http://124.223.214.31:8/api.json
 
-[615ms] 公众号【白虾工具】搜集整合
-https://mpimg.cn/text.php?hash=aeada10283cf466c508e6b05b5a11719
+[397ms] 🐮【免费分享】🐮
+https://9280.kstore.space/wex.json
 
-[646ms] 🔥豆瓣┃推荐
+[402ms] 🚀1-心魔在线
+https://gitlab.com/noimank/tvbox/-/raw/main/tvboxmuti.json
+
+[405ms] 🚀1-心魔在线
+https://gitlab.com/noimank/tvbox/-/raw/main/tvboxmuti.json
+
+[406ms] 1.\u7231\u5947\u827a\u817e\u8baf\u4f18\u9177\u9ad8\u901f\u63a5\u53e3\u3010\u652f\u6301TVBOX/\u5f71\u89c6\u4ed3\u3011\u652f\u6301V3\u7248\u672c..............................\u516c\u4f17\u53f7\u641c:PlayTV
+https://teach.link/7BgCf8
+
+[419ms] 微信小程序搜【淘软件】获取最新接口
+http://124.223.214.31:8/api.json
+
+[424ms] 🔥豆瓣┃推荐
 https://9763.kstore.vip/aowu.json
 
-[647ms] 🔥豆瓣┃推荐
+[425ms] 📺 平台直播
+http://124.223.214.31:16/8888
+
+[436ms] 公众号【白虾工具】搜集整合
+https://mpimg.cn/text.php?hash=aeada10283cf466c508e6b05b5a11719
+
+[441ms] 🔥豆瓣┃推荐
 https://9763.kstore.vip/aowu.json
 
-[648ms] 公众号【榴芒电视】
-http://8.138.7.223/tv.txt
+[444ms] 🌙月光宝盒家庭版〔多条线路〕
+https://jihulab.com/ygbh1/box/-/raw/main/dcang/dc2.json
 
-[652ms] Nostr推荐
-https://www.252035.xyz/z/FongMi.json
+[449ms] 公众号【白虾工具】搜集整合
+https://mpimg.cn/text.php?hash=aeada10283cf466c508e6b05b5a11719
 
-[656ms] 公众号【榴芒电视】
-http://8.138.7.223/tv.txt
+[458ms] 🐮【免费分享】🐮
+https://9280.kstore.vip/aiwex.json
 
-[659ms] Nostr推荐
-https://www.252035.xyz/z/FongMi.json
+[497ms] 直播
+https://gh-proxy.org/https://raw.github.com/tly824/TM-TY/main/8.10.json
 
-[661ms] 🐮【免费分享】🐮
+[504ms] 直播
+https://gh-proxy.org/https://raw.github.com/tly824/TM-TY/main/8.10.json
+
+[514ms] 🐮【免费分享】🐮
 https://9280.kstore.space/newwex.json
 
-[670ms] 豆瓣 | 精选
-http://47.96.82.41:5188/rose/18/xgg.json
-
-[673ms] 获取接口┃微信小程序搜【软件小哥哥】
-http://47.96.82.41:5188/api.json
-
-[678ms] 豆瓣 | 精选
-http://47.96.82.41:5188/rose/18/xgg.json
-
-[684ms] Nostr推荐
-https://www.252035.xyz/p/jsm.json
-
-[686ms] Nostr推荐
-https://www.252035.xyz/p/jsm.json
-
-[691ms] 🐮【免费分享】🐮
+[528ms] 🐮【免费分享】🐮
 https://9280.kstore.vip/newwex.json
 
-[692ms] 🐮【免费分享】🐮
+[529ms] 📢网络收集免费仅限测试用内置接口会崩溃！
+https://tv.nxog.top/m/111.php
+
+[530ms] 🐮【免费分享】🐮
+https://9280.kstore.vip/aiwex.json
+
+[531ms] 1.\u7231\u5947\u827a\u817e\u8baf\u4f18\u9177\u9ad8\u901f\u63a5\u53e3\u3010\u652f\u6301TVBOX/\u5f71\u89c6\u4ed3\u3011\u652f\u6301V3\u7248\u672c..............................\u516c\u4f17\u53f7\u641c:PlayTV
+https://teach.link/7BgCf8
+
+[551ms] Nostr推荐
+https://www.252035.xyz/z/FongMi.json
+
+[561ms] 🐮【免费分享】🐮
 https://9280.kstore.vip/newwex.json
 
-[696ms] 获取接口┃微信小程序搜【软件小哥哥】
-http://47.96.82.41:5188/api.json
+[561ms] SVIP📚在线
+http://xmbjm.fh4u.org/dc.txt
 
-[708ms] 🐮【免费分享】🐮
+[565ms] 🐮【免费分享】🐮
 https://9280.kstore.space/newwex.json
 
-[940ms] 4K
-https://api.starlink.fan/api/FwaII1.json
+[581ms] Nostr推荐
+https://www.252035.xyz/p/jsm.json
 
-[975ms] 4K
-https://api.starlink.fan/api/FwaII1.json
+[583ms] Nostr推荐
+https://www.252035.xyz/z/FongMi.json
 
-[991ms] ❤4KVIP线路❤
-https://700sjro44343.vicp.fun/vip/vip/duo.txt
+[591ms] Nostr推荐
+https://www.252035.xyz/p/jsm.json
 
-[993ms] 直播
-http://home.jundie.top:81/top98.json
+[595ms] 公众号【榴芒电视】
+http://8.138.7.223/tv.txt
 
-[995ms] 抖音搜：叙白┃官网：ss.laosu.xyz
-https://www.ls660.com/TV/feimao.json
+[597ms] 豆瓣 | 精选
+http://47.96.82.41:5188/rose/18/xgg.json
 
-[1007ms] 抖音搜：叙白┃官网：ss.laosu.xyz
-https://www.ls660.com/TV/feimao.json
+[601ms] 公众号【榴芒电视】
+http://8.138.7.223/tv.txt
 
-[1009ms] 直播
-http://home.jundie.top:81/top98.json
+[611ms] 获取接口┃微信小程序搜【软件小哥哥】
+http://47.96.82.41:5188/api.json
 
-[1013ms] 🧿²⁰²⁶主页┃推荐
+[620ms] 获取接口┃微信小程序搜【软件小哥哥】
+http://47.96.82.41:5188/api.json
+
+[634ms] 豆瓣 | 精选
+http://47.96.82.41:5188/rose/18/xgg.json
+
+[692ms] SVIP📚在线
+http://xmbjm.fh4u.org/dc.txt
+
+[779ms] 🧿²⁰²⁶主页┃推荐
 https://jinenge.us.kg/app/tvbox/tvbox.json
 
-[1048ms] 🧿²⁰²⁶主页┃推荐
+[783ms] 🧿²⁰²⁶主页┃推荐
 https://jinenge.us.kg/app/tvbox/tvbox.json
 
-[1087ms] ❤4KVIP线路❤
-https://700sjro44343.vicp.fun/vip/vip/duo.txt
-
-[1133ms] ❤4k接口❤①
-https://700sjro44343.vicp.fun/240731/one/duo.txt
-
-[1141ms] 抖音搜：叙白┃官网：ss.laosu.xyz
+[920ms] 抖音搜：叙白┃官网：ss.laosu.xyz
 https://www.ls660.com/TV/feimao.json
 
-[1178ms] ❤4k接口❤①
+[1054ms] 抖音搜：叙白┃官网：ss.laosu.xyz
+https://www.ls660.com/TV/feimao.json
+
+[1098ms] 直播
+http://home.jundie.top:81/top98.json
+
+[1104ms] 抖音搜：叙白┃官网：ss.laosu.xyz
+https://www.ls660.com/TV/feimao.json
+
+[1121ms] 直播
+http://home.jundie.top:81/top98.json
+
+[1174ms] ❤4KVIP线路❤
+https://700sjro44343.vicp.fun/vip/vip/duo.txt
+
+[1181ms] 🥐豆瓣┃推荐
+http://550.3vcn.work/wdjyys.json
+
+[1209ms] Kimentanm
+http://宝盒接口.top
+
+[1231ms] Kimentanm
+http://宝盒接口.top
+
+[1250ms] Kimentanm
+http://xn--6orr3pi6g9uu.top/
+
+[1251ms] Kimentanm
+http://xn--6orr3pi6g9uu.top/
+
+[1262ms] ❤4KVIP线路❤
+https://700sjro44343.vicp.fun/vip/vip/duo.txt
+
+[1330ms] 饭太硬
+http://z.qiqiv.cn/123.txt
+
+[1338ms] ❤4k接口❤①
 https://700sjro44343.vicp.fun/240731/one/duo.txt
 
-[1219ms] 🥐豆瓣┃推荐
-http://550.3vcn.work/wdjyys.json
-
-[1228ms] 🥐豆瓣┃推荐
-http://550.3vcn.work/wdjyys.json
-
-[1347ms] Kimentanm
-http://xn--6orr3pi6g9uu.top/
-
-[1366ms] Kimentanm
-http://xn--6orr3pi6g9uu.top/
-
-[1503ms] 平台直播
-https://700sjro44343.vicp.fun/vip/vip/tv.json
-
-[1548ms] Kimentanm
-http://宝盒接口.top
-
-[1554ms] Kimentanm
-http://宝盒接口.top
-
-[1641ms] 平台直播
-https://700sjro44343.vicp.fun/vip/vip/tv.json
-
-[1715ms] 饭太硬
+[1348ms] 饭太硬
 http://z.qiqiv.cn/123.txt
 
-[1723ms] 饭太硬
-http://z.qiqiv.cn/123.txt
+[1368ms] ❤4k接口❤①
+https://700sjro44343.vicp.fun/240731/one/duo.txt
 
-[1851ms] 平台直播
-https://700sjro44343.vicp.fun/eggp/0211/tv.json
+[1374ms] 4K
+https://api.starlink.fan/api/FwaII1.json
 
-[1869ms] 平台直播
-https://700sjro44343.vicp.fun/eggp/0211/tv.json
+[1423ms] 🥐豆瓣┃推荐
+http://550.3vcn.work/wdjyys.json
 
-[1927ms] 农民|御
+[1431ms] 4K
+https://api.starlink.fan/api/FwaII1.json
+
+[1542ms] 📢免费仅限测试用，如有收费,直接找退款！
+https://tv.nxog.top/m/111.php
+
+[1662ms] 平台直播
+https://700sjro44343.vicp.fun/vip/vip/tv.json
+
+[1678ms] 平台直播
+https://700sjro44343.vicp.fun/vip/vip/tv.json
+
+[1730ms] 农民|御
 https://yqx.imgos.cn/yqx/tv/yqx2.json
 
-[1938ms] 农民|御
+[1779ms] 农民|御
 https://yqx.imgos.cn/yqx/tv/yqx2.json
 
-[3049ms] 电视直播
+[1815ms] 平台直播
+https://700sjro44343.vicp.fun/eggp/0211/tv.json
+
+[1833ms] 平台直播
+https://700sjro44343.vicp.fun/eggp/0211/tv.json
+
+[1887ms] 电视直播
 https://android.lushunming.qzz.io/json/index.json
 
-[3065ms] 电视直播
+[2936ms] 电视直播
 https://android.lushunming.qzz.io/json/index.json
 
-[4160ms] 🤓芙蕾影视丨请勿相信任何广告
+[3213ms] 🤓芙蕾影视丨请勿相信任何广告
 https://gitee.com/fuleishu/fulei/raw/master/fuleixyx.json
 
-[4378ms] 🤓芙蕾影视丨请勿相信任何广告
+[3324ms] 🤓芙蕾影视丨请勿相信任何广告
 https://gitee.com/fuleishu/fulei/raw/master/fuleixyx.json
-
-[5941ms] show
-https://gitee.com/zhel-yong/doudou-movies--tv/blob/master/%E8%B1%86%E8%B1%86%E5%BD%B1%E8%A7%86.json
-
-[6264ms] show
-https://gitee.com/zhel-yong/doudou-movies--tv/blob/master/%E8%B1%86%E8%B1%86%E5%BD%B1%E8%A7%86.json
 
